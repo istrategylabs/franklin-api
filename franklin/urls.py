@@ -16,9 +16,10 @@ Including another URLconf
 from django.conf.urls import include, url
 from django.contrib import admin
 
-from github.views import auth
+from github.views import auth, callback
 
 urlpatterns = [
     url(r'^admin/', include(admin.site.urls)),
     url(r'^auth/', auth, name='auth'),
+    url(r'^callback/', callback, name='callback'),
 ]
