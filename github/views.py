@@ -41,9 +41,13 @@ def callback(request):
     r = requests.get('https://api.github.com/user', params=payload)
 
     # Create user object once authenticated
+    # TODO: Should probably check to see if user already exists
     User.objects.create(
         username=r.json()['login'],
         github_token=access_token
     )
 
     return HttpResponse(status=200)
+
+def deploy_hook(request):
+    pass
