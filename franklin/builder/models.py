@@ -15,7 +15,7 @@ class Site(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     git_hash = models.CharField(max_length=50)
     repo_name = models.CharField(max_length=20, default='')
-    path = models.CharField(max_length=50)
+    path = models.CharField(max_length=100)
 
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']
