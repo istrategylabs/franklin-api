@@ -80,8 +80,10 @@ WSGI_APPLICATION = 'franklin.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql_psycopg2",
-        "NAME": os.environ['DB_NAME'],
-        "HOST": os.environ['DB_HOST'],
+        'NAME': 'postgres',
+        'USER': 'postgres',
+        'HOST': 'db',
+        'PORT': 5432,
     }
 }
 
