@@ -2,6 +2,7 @@ db:
   image: postgres
 web:
   build: .
+  dockerfile: dockerfile-api
   env_file: .env
   working_dir: /code/franklin
   command: python manage.py runserver 0.0.0.0:8000
@@ -11,3 +12,11 @@ web:
     - "8000:8000"
   links:
     - db
+worker:
+  build: .
+  dockerfile: dockerfile-build
+  env_file: .env
+  working_dir: /code
+  command: python api.py
+  ports:
+    - "5000:5000"
