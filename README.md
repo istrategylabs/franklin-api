@@ -21,3 +21,7 @@
       BASE_PROJECT_PATH=~/Desktop
       DJANGO_SETTINGS_MODULE=config.settings.local
     ```
+
+## Making Changes to the Code
+
+- If your code change includes a new requirement, you will likely have to run `docker-compose build`. This will re-run the build step which will include a pip install of all requirements.
