@@ -6,8 +6,7 @@
 
 1. Install [docker toolbox](https://www.docker.com/toolbox)
 1. Initialize your docker machine system if you have not already: `docker-machine start default`
-1. Run (or add you dotfiles) `eval "$(docker-machine env default)"` - this will make sure your environment is setup correctly
-1. Run `docker-compose up`
+1. Run our startup script: `. ./scripts/setup.sh`
 1. In a new shell run `docker-machine ip default` to find out the IP address of your container
 1. Visit site at `<my-ip>:8000`
 1. Run commands inside the container like such: `docker-compose run web python manage.py migrate`
