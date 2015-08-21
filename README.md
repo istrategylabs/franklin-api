@@ -1,5 +1,7 @@
 # franklin
 
+![franklin](http://www.brand-licensing.com/DBImages/lizenzen/franklin-logo.jpg)
+
 ## Installation
 
 1. Install [docker toolbox](https://www.docker.com/toolbox)
