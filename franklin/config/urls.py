@@ -16,6 +16,8 @@ Including another URLconf
 from django.conf.urls import include, url
 from django.contrib import admin
 
+from .views import health
+
 from github.views import auth, callback, deploy_hook
 
 urlpatterns = [
@@ -23,4 +25,5 @@ urlpatterns = [
     url(r'^auth/', auth, name='auth'),
     url(r'^callback/', callback, name='callback'),
     url(r'^deployed/', deploy_hook, name='deploy'),
+    url(r'^health/', health, name='health'),
 ]
