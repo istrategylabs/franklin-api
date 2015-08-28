@@ -1,5 +1,7 @@
 # franklin
 
+Now with Github deploys!
+
 ![franklin](http://www.brand-licensing.com/DBImages/lizenzen/franklin-logo.jpg)
 
 ## Installation
