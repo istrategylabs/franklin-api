@@ -25,5 +25,5 @@ urlpatterns = [
     url(r'^auth/', auth, name='auth'),
     url(r'^callback/', callback, name='callback'),
     url(r'^deployed/', deploy_hook, name='deploy'),
-    url(r'^health/', health, name='health'),
+    url(r'^health/$', health, name='health'),
 ]
