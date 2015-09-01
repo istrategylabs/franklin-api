@@ -15,9 +15,14 @@ class Site(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     repo_name = models.CharField(max_length=100)
     git_hash = models.CharField(max_length=40)
+    url = models.CharField(max_length=100, default='', db_index=True)
     path = models.CharField(max_length=100)
 
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']
         self.path = "{0}/{1}".format(base_path, self.repo_name)
+        self.url = "{0}.{1}".format(
+            self.repo_name.replace('/', '-'),
+            os.environ['BASE_URL']
+        )
         super(Site, self).save(*args, **kwargs)

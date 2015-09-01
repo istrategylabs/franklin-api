@@ -23,6 +23,7 @@ Now with Github deploys!
       CLIENT_SECRET=<github_client_secret>
       BASE_PROJECT_PATH=~/Desktop
       DJANGO_SETTINGS_MODULE=config.settings.local
+      BASE_URL=islstatic.com
     ```
 
 ## Making Changes to the Code
