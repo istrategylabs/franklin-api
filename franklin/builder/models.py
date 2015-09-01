@@ -1,3 +1,5 @@
+import requests
+import json
 import os
 import uuid
 
@@ -17,6 +19,24 @@ class Site(models.Model):
     git_hash = models.CharField(max_length=40)
     url = models.CharField(max_length=100, default='', db_index=True)
     path = models.CharField(max_length=100)
+
+    def build(self, git_hash, repo_owner, path, repo_name):
+        url = os.environ['BUILDER_URL']
+        headers = {'content-type': 'application/json'}
+        body = {
+                    "git_hash": git_hash,
+                    "repo_owner": repo_owner,
+                    "path": path,
+                    "repo_name": repo_name
+                }
+        try:
+            r = requests.post(url, data=json.dumps(body), headers=headers)
+            print('Response HTTP Status Code   : {status_code}'.format(
+                status_code=r.status_code))
+            print('Response HTTP Response Body : {content}'.format(
+                content=r.content))
+        except requests.exceptions.RequestException as e:
+            print(e)
 
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']
