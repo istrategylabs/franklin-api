@@ -24,6 +24,7 @@ Now with Github deploys!
       BASE_PROJECT_PATH=~/Desktop
       DJANGO_SETTINGS_MODULE=config.settings.local
       BASE_URL=franklinstatic.com
+      SECRET_KEY=<your_secret_key>
     ```
 
 ## Making Changes to the Code
