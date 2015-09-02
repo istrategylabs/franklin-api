@@ -20,14 +20,15 @@ class Site(models.Model):
     url = models.CharField(max_length=100, default='', db_index=True)
     path = models.CharField(max_length=100)
 
-    def build(self, git_hash, repo_owner, path, repo_name):
+    def build(self):
         url = os.environ['BUILDER_URL']
+        repo_owner = self.repo_name.split("/")[0]
         headers = {'content-type': 'application/json'}
         body = {
-                    "git_hash": git_hash,
+                    "git_hash": self.git_hash,
                     "repo_owner": repo_owner,
-                    "path": path,
-                    "repo_name": repo_name
+                    "path": self.path,
+                    "repo_name": self.repo_name
                 }
         try:
             r = requests.post(url, data=json.dumps(body), headers=headers)
@@ -47,6 +48,7 @@ class Site(models.Model):
                 os.environ['BASE_URL']
             )
         super(Site, self).save(*args, **kwargs)
+        self.build()
 
     def __str__(self):
         return self.repo_name

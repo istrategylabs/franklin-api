@@ -25,6 +25,7 @@ Now with Github deploys!
       DJANGO_SETTINGS_MODULE=config.settings.local
       BASE_URL=franklinstatic.com
       SECRET_KEY=<your_secret_key>
+      BUILDER_URL=<franklin_builder_url>
     ```
 
 ## Making Changes to the Code
