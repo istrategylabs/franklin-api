@@ -21,8 +21,9 @@ class Site(models.Model):
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']
         self.path = "{0}/{1}".format(base_path, self.repo_name)
-        self.url = "{0}.{1}".format(
-            self.repo_name.replace('/', '-'),
-            os.environ['BASE_URL']
-        )
+        if not self.url:
+            self.url = "{0}.{1}".format(
+                self.repo_name.replace('/', '-'),
+                os.environ['BASE_URL']
+            )
         super(Site, self).save(*args, **kwargs)
