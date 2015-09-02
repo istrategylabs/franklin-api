@@ -27,3 +27,6 @@ class Site(models.Model):
                 os.environ['BASE_URL']
             )
         super(Site, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return self.repo_name
