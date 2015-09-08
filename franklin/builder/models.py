@@ -19,6 +19,7 @@ class Site(models.Model):
     git_hash = models.CharField(max_length=40)
     url = models.CharField(max_length=100, default='', db_index=True)
     path = models.CharField(max_length=100)
+    status = models.CharField(max_length=200, blank=True, null=True)
 
     def build(self):
         url = os.environ['BUILDER_URL']
@@ -39,7 +40,7 @@ class Site(models.Model):
         except requests.exceptions.RequestException as e:
             print(e)
 
-    def save(self, *args, **kwargs):
+    def save(self, build=False, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']
         self.path = "{0}/{1}".format(base_path, self.repo_name)
         if not self.url:
@@ -48,7 +49,8 @@ class Site(models.Model):
                 os.environ['BASE_URL']
             )
         super(Site, self).save(*args, **kwargs)
-        self.build()
+        if build:
+            self.build()
 
     def __str__(self):
         return self.repo_name

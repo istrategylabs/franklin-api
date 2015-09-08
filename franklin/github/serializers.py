@@ -7,7 +7,7 @@ class HeadCommitSerializer(serializers.Serializer):
     id = serializers.CharField(min_length=40, max_length=40)
     # Also available
     # message, timestamp, url, author{}, committer{}, ...
-    
+
 class RepositorySerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=100)
     # Also available
@@ -27,5 +27,6 @@ class GithubWebhookSerializer(serializers.Serializer):
         git_hash = validated_data.pop('head_commit').get('id')
         site, created = Site.objects.get_or_create(repo_name=repo.get('full_name'))
         site.git_hash = git_hash
-        site.save()
+        site.status = "Building"
+        site.save(build=True)
         return site

@@ -18,6 +18,8 @@ from django.contrib import admin
 
 from .views import health
 
+from builder.views import build_status
+
 from github.views import auth, callback, deploy_hook
 
 urlpatterns = [
@@ -26,4 +28,5 @@ urlpatterns = [
     url(r'^callback/', callback, name='callback'),
     url(r'^deployed/', deploy_hook, name='deploy'),
     url(r'^health/$', health, name='health'),
+    url(r'^status/$', build_status, name='status'),
 ]
