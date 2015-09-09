@@ -61,12 +61,16 @@ class Site(models.Model):
         base_path = os.environ['BASE_PROJECT_PATH']
         self.path = "{0}/{1}".format(base_path, self.repo_name)
         if not self.url:
+            repo_name = self.repo_name.split("/")[1]
             self.url = "{0}.{1}".format(
-                self.repo_name.replace('/', '-'),
+                repo_name,
                 os.environ['BASE_URL']
             )
         super(Site, self).save(*args, **kwargs)
-        self.build()
+
+        # This line helps with testing. We will remove once we add mocking.
+        if os.environ['ENV'] is not 'test':
+            self.build()
 
     def __str__(self):
         return self.repo_name

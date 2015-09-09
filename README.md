@@ -26,6 +26,7 @@ Now with Github deploys!
       BASE_URL=franklinstatic.com
       SECRET_KEY=<your_secret_key>
       BUILDER_URL=<franklin_builder_url>
+      ENV='local'
     ```
 
 ## Making Changes to the Code
