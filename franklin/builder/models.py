@@ -34,17 +34,14 @@ class Site(models.Model):
                     "path": self.path,
                     "repo_name": repo_name
                 }
-        try:
-            r = requests.post(url, data=json.dumps(body), headers=headers)
-            response = r.json()['building']
-            if not response:
-                logger.error("Builder says its not building")
+        r = requests.post(url, data=json.dumps(body), headers=headers)
+        response = r.json()['building']
+        if not response:
+            logger.error("Builder says its not building")
             print('Response HTTP Status Code   : {status_code}'.format(
                 status_code=r.status_code))
             print('Response HTTP Response Body : {content}'.format(
                 content=r.content))
-        except requests.exceptions.RequestException as e:
-            logger.error("Failed to call build api")
 
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']
