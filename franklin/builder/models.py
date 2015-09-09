@@ -26,15 +26,19 @@ class Site(models.Model):
     def build(self):
         url = os.environ['BUILDER_URL']
         repo_owner = self.repo_name.split("/")[0]
+        repo_name = self.repo_name.split("/")[1]
         headers = {'content-type': 'application/json'}
         body = {
                     "git_hash": self.git_hash,
                     "repo_owner": repo_owner,
                     "path": self.path,
-                    "repo_name": self.repo_name
+                    "repo_name": repo_name
                 }
         try:
             r = requests.post(url, data=json.dumps(body), headers=headers)
+            repo_name = r.get('building', None)
+            if not repo_name:
+                logger.error("Builder says its not building")
             print('Response HTTP Status Code   : {status_code}'.format(
                 status_code=r.status_code))
             print('Response HTTP Response Body : {content}'.format(
