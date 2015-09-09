@@ -36,8 +36,8 @@ class Site(models.Model):
                 }
         try:
             r = requests.post(url, data=json.dumps(body), headers=headers)
-            repo_name = r.get('building', None)
-            if not repo_name:
+            response = r.json()['building']
+            if not response:
                 logger.error("Builder says its not building")
             print('Response HTTP Status Code   : {status_code}'.format(
                 status_code=r.status_code))
