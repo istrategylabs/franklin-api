@@ -34,14 +34,28 @@ class Site(models.Model):
                     "path": self.path,
                     "repo_name": repo_name
                 }
-        r = requests.post(url, data=json.dumps(body), headers=headers)
-        response = r.json()['building']
-        if not response:
-            logger.error("Builder says its not building")
-            print('Response HTTP Status Code   : {status_code}'.format(
-                status_code=r.status_code))
-            print('Response HTTP Response Body : {content}'.format(
-                content=r.content))
+        r = None
+        try:
+            r = requests.post(url, data=json.dumps(body), headers=headers)
+        except (ConnectionError, HTTPError, Timeout) as e:
+            logger.error('Response HTTP Status Code   : %s', e.status_code)
+            logger.error('Response HTTP Response Body : %s', e.content)
+        except:
+            logger.error('Unexpected Builder error: %s', sys.exc_info()[0])
+
+        if r is not None:
+            if (r.status_code == requests.codes.ok and 
+                    r.headers['Content-Type'] == 'application/json'):
+                building_status = r.json()['building']
+                if not building_status:
+                    logger.error("Negative response from Builder")
+                # TODO - Update the DB with builder's status. There should beFive 
+                # states should be: 'STARTING', 'BUILDING', 'NOT BUILDING', 
+                # 'DEPLOY SUCCESS', and 'DEPLOY FAILED'
+            else:
+                logger.error('Builder responsed without json')
+        else:
+            logger.error('Bad response from builder.')
 
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']

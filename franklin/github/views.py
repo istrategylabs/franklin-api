@@ -1,5 +1,5 @@
+import logging
 import os
-
 import requests
 
 from django.shortcuts import render
@@ -14,6 +14,8 @@ from users.models import User
 
 client_id = os.environ['CLIENT_ID']
 client_secret = os.environ['CLIENT_SECRET']
+
+logger = logging.getLogger(__name__)
 
 def auth(request):
     context = {'client_id': client_id}
@@ -69,4 +71,11 @@ def deploy_hook(request):
             if updated_site.is_valid():
                 updated_site.save()
                 return Response(status=status.HTTP_201_CREATED)
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+            else:
+                logger.warning("Received an invalid Github Webhook message")
+        else:
+            logger.warning("Received a malformed POST message")
+    else:
+        # Invalid methods are caught at a higher level
+        pass
+    return Response(status=status.HTTP_400_BAD_REQUEST)
