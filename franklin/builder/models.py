@@ -1,9 +1,12 @@
+import logging
 import requests
 import json
 import os
 import uuid
 
 from django.db import models
+
+logger = logging.getLogger(__name__)
 
 
 class Site(models.Model):
@@ -37,7 +40,7 @@ class Site(models.Model):
             print('Response HTTP Response Body : {content}'.format(
                 content=r.content))
         except requests.exceptions.RequestException as e:
-            print(e)
+            logger.error("Failed to call build api")
 
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']
