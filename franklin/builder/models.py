@@ -29,6 +29,7 @@ class Site(models.Model):
         repo_name = self.repo_name.split("/")[1]
         headers = {'content-type': 'application/json'}
         body = {
+                    "github_token": os.environ['GITHUB_OAUTH'],
                     "git_hash": self.git_hash,
                     "repo_owner": repo_owner,
                     "path": self.path,
