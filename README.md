@@ -29,6 +29,11 @@ Now with Github deploys!
       ENV='local'
       GITHUB_OAUTH=<github_oauth_token>
     ```
+- Projects you wish to be deployed by franklin will need a `.franklin` file in their root
+
+  ```
+    branch: master # Default. Change if you want to deploy a different branch
+  ```
 
 ## Making Changes to the Code
 
