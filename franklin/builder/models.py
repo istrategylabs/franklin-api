@@ -1,7 +1,9 @@
 import logging
-import requests
 import json
 import os
+import requests
+from requests.exceptions import ConnectionError, HTTPError, Timeout
+import sys
 import uuid
 
 from django.db import models
@@ -39,8 +41,7 @@ class Site(models.Model):
         try:
             r = requests.post(url, data=json.dumps(body), headers=headers)
         except (ConnectionError, HTTPError, Timeout) as e:
-            logger.error('Response HTTP Status Code   : %s', e.status_code)
-            logger.error('Response HTTP Response Body : %s', e.content)
+            logger.error('Connection exception : %s', e)
         except:
             logger.error('Unexpected Builder error: %s', sys.exc_info()[0])
 
@@ -54,7 +55,7 @@ class Site(models.Model):
                 # states should be: 'STARTING', 'BUILDING', 'NOT BUILDING', 
                 # 'DEPLOY SUCCESS', and 'DEPLOY FAILED'
             else:
-                logger.error('Builder responsed without json')
+                logger.error('Builder responded without json')
         else:
             logger.error('Bad response from builder.')
 

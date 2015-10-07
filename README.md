@@ -44,14 +44,16 @@ Now with Github deploys!
 ###ngrok: 
 
 1. Install [ngrok](https://ngrok.com/)
-1. Start franklin-build
+1. Start `franklin-api` (See Installation above)
 1. From the ngrok install location, run `ngrok http [port-for-franklin]`
 1. ngrok will tell you the endpoint you can hit
 1. You're endpoint will be something like `http://b551e0ad.ngrok.io/deployed`
 1. You'll know it's working as ngrok will log http status codes for every request
+1. Test it by dropping the url in any web browser on any computer. The response and ngrok server logs should record a rejected GET request on an endpoint that only accepts POST.
+1. Bonus: You can also do the above for [franklin-build](https://github.com/istrategylabs/franklin-build), and use the ngrok endpoint as your `BUILDER_URL` in your `.env`. Do this before starting `franklin-api`. ngrok can manage both endpoints at the same time. You could also point your local `franklin-api` to your test environment for `franklin-build`. Thus, you'll be working with production ready code while you prototype your changes here. 
 
 ### Github Webhooks: 
-1. Start at the url for your test projects repo e.g. `https://github.com/istrategylabs/franklin-api`
+1. Start at the url for your test project's repo (e.g. `https://github.com/istrategylabs/franklin-api`)
 1. Go to `settings > Webhooks & services > Add webhook`
 1. The url should be the url supplied by `ngrok` above, ending with our endpoint /deployed
 1. Leave all other defaults unless you've enabled security on the endpoint.

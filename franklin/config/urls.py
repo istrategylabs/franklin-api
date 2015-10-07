@@ -18,12 +18,13 @@ from django.contrib import admin
 
 from .views import health
 
-from github.views import auth, callback, deploy_hook
+from github.views import auth, callback, deploy_hook, register_org
 
 urlpatterns = [
     url(r'^admin/', include(admin.site.urls)),
     url(r'^auth/', auth, name='auth'),
     url(r'^callback/', callback, name='callback'),
     url(r'^deployed/', deploy_hook, name='deploy'),
+    url(r'^register/', register_org, name='register'),
     url(r'^health/$', health, name='health'),
 ]
