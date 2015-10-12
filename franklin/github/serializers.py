@@ -10,8 +10,9 @@ class HeadCommitSerializer(serializers.Serializer):
     
 class RepositorySerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=100)
+    id = serializers.IntegerField()
     # Also available
-    # id, name, owner{}, html_url, fork, url, master_branch, ...
+    # name, owner{}, html_url, fork, url, master_branch, ...
 
 class GithubWebhookSerializer(serializers.Serializer):
     head_commit = HeadCommitSerializer()
@@ -23,9 +24,9 @@ class GithubWebhookSerializer(serializers.Serializer):
     # github during our setup step.
     # https://developer.github.com/v3/repos/hooks/#create-a-hook
     def create(self, validated_data):
-        repo = validated_data.pop('repository')
+        repo_id = validated_data.pop('repository').get('id')
         git_hash = validated_data.pop('head_commit').get('id')
-        site, created = Site.objects.get_or_create(repo_name=repo.get('full_name'))
+        site, created = Site.objects.get_or_create(repo_name_id=repo_id)
         site.git_hash = git_hash
         site.save()
         return site

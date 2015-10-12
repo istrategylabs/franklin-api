@@ -1,5 +1,6 @@
-import logging
+import enum
 import json
+import logging
 import os
 import requests
 from requests.exceptions import ConnectionError, HTTPError, Timeout
@@ -8,6 +9,8 @@ import uuid
 
 from django.db import models
 
+from rest_framework import status
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,27 +18,51 @@ class Site(models.Model):
     """ Represents a 'deployed' or soon-to-be deployed static site.
 
     :param id: A unique site identified
-    :param repo_name: The full repo name of project on github
+    :param owner: The name of the owner of the repo on github. (User or Org)
+    :param owner_id: Unqiue ID github has assigned the owner
+    :param repo_name: The name of the project on github
+    :param repo_name_id: Unique ID github has assigned the project
     :param git_hash: The git hash of the deployed code
+    :param url: The url builder has deployed this project to
     :param path: The path of the site on the static server
+    :param oauth_token: Token used to access the project on github
+    :param status: The current status of the deployed version on Franklin
     """
+
+    REGISTERED = 'REG'
+    BUILDING = 'BLD'
+    SUCCESS = 'SUC'
+    FAILED = 'FAL'
+
+    STATUS_CHOICES = (
+        (REGISTERED, 'Webhook Registered'),
+        (BUILDING, 'Building Now'),
+        (SUCCESS, 'Deploy Succeeded'),
+        (FAILED, 'Deploy Failed')
+    )
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.CharField(max_length=100, default='')
+    owner_id = models.PositiveIntegerField(blank=True, null=True)
     repo_name = models.CharField(max_length=100)
+    repo_name_id = models.PositiveIntegerField(blank=True, null=True)
     git_hash = models.CharField(max_length=40)
     url = models.CharField(max_length=100, default='', db_index=True)
     path = models.CharField(max_length=100)
+    oauth_token = models.CharField(max_length=255, default='')
+    status = models.CharField(
+        max_length=3, choices=STATUS_CHOICES, default=REGISTERED)
 
     def build(self):
+        self.status = self.BUILDING 
         url = os.environ['BUILDER_URL']
-        repo_owner = self.repo_name.split("/")[0]
-        repo_name = self.repo_name.split("/")[1]
         headers = {'content-type': 'application/json'}
         body = {
-                    "github_token": os.environ['GITHUB_OAUTH'],
+                    "github_token": self.oauth_token,
                     "git_hash": self.git_hash,
-                    "repo_owner": repo_owner,
+                    "repo_owner": self.repo_owner,
                     "path": self.path,
-                    "repo_name": repo_name
+                    "repo_name": self.repo_name
                 }
         r = None
         try:
@@ -46,14 +73,11 @@ class Site(models.Model):
             logger.error('Unexpected Builder error: %s', sys.exc_info()[0])
 
         if r is not None:
-            if (r.status_code == requests.codes.ok and 
+            if (status.is_success(r.status_code) and 
                     r.headers['Content-Type'] == 'application/json'):
                 building_status = r.json()['building']
                 if not building_status:
                     logger.error("Negative response from Builder")
-                # TODO - Update the DB with builder's status. There should beFive 
-                # states should be: 'STARTING', 'BUILDING', 'NOT BUILDING', 
-                # 'DEPLOY SUCCESS', and 'DEPLOY FAILED'
             else:
                 logger.error('Builder responded without json')
         else:
@@ -61,18 +85,9 @@ class Site(models.Model):
 
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']
-        self.path = "{0}/{1}".format(base_path, self.repo_name)
-        if not self.url:
-            repo_name = self.repo_name.split("/")[1]
-            self.url = "{0}.{1}".format(
-                repo_name,
-                os.environ['BASE_URL']
-            )
+        self.path = "{0}/{1}/{2}".format(base_path, self.owner, self.repo_name)
+        self.url = "{0}.{1}".format(self.repo_name, os.environ['BASE_URL'])
         super(Site, self).save(*args, **kwargs)
-
-        # This line helps with testing. We will remove once we add mocking.
-        if os.environ['ENV'] is not 'test':
-            self.build()
 
     def __str__(self):
         return self.repo_name
