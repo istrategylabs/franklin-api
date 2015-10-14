@@ -18,15 +18,12 @@ class GithubWebhookSerializer(serializers.Serializer):
     head_commit = HeadCommitSerializer()
     repository = RepositorySerializer()
 
-    # TODO - We may want to do an update instead of a create
-    # We may want to do creation as a separate setup step for new projects.
-    # That would have us auto-configuring webhooks by making secure calls to
-    # github during our setup step.
-    # https://developer.github.com/v3/repos/hooks/#create-a-hook
-    def create(self, validated_data):
-        repo_id = validated_data.pop('repository').get('id')
-        git_hash = validated_data.pop('head_commit').get('id')
-        site, created = Site.objects.get_or_create(repo_name_id=repo_id)
-        site.git_hash = git_hash
-        site.save()
-        return site
+    def get_existing_site(self):
+        if self.is_valid():
+            repo_id = self.validated_data.pop('repository').get('id')
+            git_hash = self.validated_data.pop('head_commit').get('id')
+            site = Site.objects.get(repo_name_id=repo_id)
+            if site:
+                site.git_hash = git_hash
+                return site
+        return None

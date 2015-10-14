@@ -1,4 +1,3 @@
-import enum
 import json
 import logging
 import os
@@ -53,14 +52,19 @@ class Site(models.Model):
     status = models.CharField(
         max_length=3, choices=STATUS_CHOICES, default=REGISTERED)
 
+    def is_deployable_event(self, github_event):
+        # TODO - add logic here to compare data from the github webhook event
+        # with what we already have in the DB about acceptable deploy events.
+        # e.g. Only if branch 'release' and has a tag formatted 'v ##.##.##'
+        return True
+
     def build(self):
-        self.status = self.BUILDING 
         url = os.environ['BUILDER_URL']
         headers = {'content-type': 'application/json'}
         body = {
                     "github_token": self.oauth_token,
                     "git_hash": self.git_hash,
-                    "repo_owner": self.repo_owner,
+                    "repo_owner": self.owner,
                     "path": self.path,
                     "repo_name": self.repo_name
                 }
@@ -76,12 +80,18 @@ class Site(models.Model):
             if (status.is_success(r.status_code) and 
                     r.headers['Content-Type'] == 'application/json'):
                 building_status = r.json()['building']
-                if not building_status:
+                if building_status:
+                    self.status = self.BUILDING
+                    self.save()
+                    return
+                else:
                     logger.error("Negative response from Builder")
             else:
                 logger.error('Builder responded without json')
         else:
             logger.error('Bad response from builder.')
+        self.status = self.FAILED
+        self.save()
 
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']

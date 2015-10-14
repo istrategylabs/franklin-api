@@ -1,7 +1,6 @@
-import logging
 import json
+import logging
 import os
-import re
 import requests
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 import sys
@@ -159,10 +158,9 @@ def get_franklin_config(site):
     if response is not None:
         download_url = response.json().get('download_url', None)
         raw_data = make_rest_get_call(download_url, None)
-        # TODO - validation and cleanup needed here
+        # TODO - validation and cleanup needed here similar to:
+        # http://stackoverflow.com/a/22231372
         franklin_config = yaml.load(raw_data.text)
-        #franklin_config.get('hello', None)
-        # close yaml file?
         return franklin_config
     return None
 
@@ -224,13 +222,15 @@ def deploy_hook(request):
                 # For now, we only support push to branch events
                 # TODO - We should also only support pushes to specific branches
 
-                updated_site = GithubWebhookSerializer(data=request.data)
-                if updated_site.is_valid():
-                    updated_site.save()
-                    # This line helps with testing. We will remove once we add mocking.
-                    if os.environ['ENV'] is not 'test':
-                        updated_site.build()
-                    return Response(status=status.HTTP_201_CREATED)
+                github_event = GithubWebhookSerializer(data=request.data)
+                if github_event:
+                    site = github_event.get_existing_site()
+                    if site and site.is_deployable_event(github_event):
+                        site.save()
+                        # This line helps with testing. We will remove once we add mocking.
+                        if os.environ['ENV'] is not 'test':
+                            site.build()
+                            return Response(status=status.HTTP_201_CREATED)
                 else:
                     logger.warning("Received an invalid Github Webhook message")
             elif event_type == 'ping':

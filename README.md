@@ -32,7 +32,8 @@ Now with Github deploys!
 - Projects you wish to be deployed by franklin will need a `.franklin` file in their root
 
   ```
-    branch: master # Default. Change if you want to deploy a different branch
+    TODO - add example build/deploy settings here.
+    Note - Environment configuration will likely be handled during the registration step. So not here.
   ```
 
 ## Making Changes to the Code
