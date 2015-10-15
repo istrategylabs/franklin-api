@@ -1,8 +1,8 @@
 from django.contrib import admin
-from .models import Site
+from builder.models import Build, Environment, Owner, Site
 
-class SiteAdmin(admin.ModelAdmin):
-    fields = ('owner', 'owner_id', 'repo_name', 'repo_name_id', 'git_hash', \
-              'url', 'path', 'oauth_token', 'status')
 
-admin.site.register(Site, SiteAdmin)
+admin.site.register(Build)
+admin.site.register(Environment)
+admin.site.register(Owner)
+admin.site.register(Site)

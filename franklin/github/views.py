@@ -14,6 +14,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from builder.models import Site
+from builder.serializers import SiteSerializer
 from github.serializers import GithubWebhookSerializer
 from users.models import User
 
@@ -73,11 +74,9 @@ def make_rest_get_call(url, headers):
         logger.error('Unexpected REST GET error: %s', sys.exc_info()[0])
 
     if response is not None:
-        if status.is_success(response.status_code):
-            return response
-        else:
-            logger.warn('Bad GET response code of', response.status_code)
-    return None
+        if not status.is_success(response.status_code):
+            logger.warn('Bad GET response code of %s', response.status_code)
+    return response
 
 def make_rest_post_call(url, headers, body):
     response = None
@@ -89,11 +88,9 @@ def make_rest_post_call(url, headers, body):
         logger.error('Unexpected REST POST error: %s', sys.exc_info()[0])
 
     if response is not None:
-        if status.is_success(response.status_code):
-            return response
-        else:
-            logger.warn('Bad POST response code of', response.status_code)
-    return None
+        if not status.is_success(response.status_code):
+            logger.warn('Bad POST response code of %s', response.status_code)
+    return response
 
 # Not currently used. but it works.
 #def get_owners_repos(owner_name):
@@ -129,40 +126,26 @@ def make_rest_post_call(url, headers, body):
 #        logger.error('Failed to find repos for owner', owner_name)
 #    return repos
 
-def get_site_from_request(request):
-    owner_name = request.data.get('owner', None)
-    owner_id = request.data.get('owner_id', None)
-    repo_name = request.data.get('repository', None)
-    repo_id = request.data.get('repository_id', None)
-    if owner_id and repo_id:
-        site, created = Site.objects.get_or_create(owner_id=owner_id, 
-                                                   repo_name_id=repo_id)
-        if site:
-            site.owner = owner_name
-            site.repo_name = repo_name
-            site.oauth_token = os.environ['GITHUB_OAUTH']
-            site.save()
-            return site
-    return None
-
-
 def get_franklin_config(site):
-    url = github_base + 'repos/' + site.owner + '/' + site.repo_name + '/contents/.franklin.yml'
+    url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/contents/.franklin.yml'
     #TODO - This will fetch the file from the default master branch
     headers = {
                 'content-type': 'application/json',
-                'Authorization': 'token ' + site.oauth_token
+                'Authorization': 'token ' + site.deploy_key
               }
-    response = make_rest_get_call(url, headers)
+    config_metadata = make_rest_get_call(url, headers)
 
-    if response is not None:
-        download_url = response.json().get('download_url', None)
-        raw_data = make_rest_get_call(download_url, None)
-        # TODO - validation and cleanup needed here similar to:
-        # http://stackoverflow.com/a/22231372
-        franklin_config = yaml.load(raw_data.text)
-        return franklin_config
-    return None
+    if status.is_success(config_metadata.status_code):
+        download_url = config_metadata.json().get('download_url', None)
+        config_payload = make_rest_get_call(download_url, None)
+        if status.is_success(config_payload.status_code):
+            # TODO - validation and cleanup needed here similar to:
+            # http://stackoverflow.com/a/22231372
+            franklin_config = yaml.load(config_payload.text)
+            return franklin_config
+        else:
+            return config_payload
+    return config_metadata
 
 def create_repo_webhook(site):
     # TODO - check for existing webhook and update if needed (or skip)
@@ -170,7 +153,7 @@ def create_repo_webhook(site):
     # TODO - Confirm that a header token is the best/most secure way to go
     headers = {
                 'content-type': 'application/json',
-                'Authorization': 'token ' + site.oauth_token
+                'Authorization': 'token ' + site.deploy_key
               }
     body = {
                 'name': 'web',
@@ -181,33 +164,29 @@ def create_repo_webhook(site):
                                 'content_type': 'json'
                           }
             }
-    url = github_base + 'repos/' + site.owner + '/' + site.repo_name + '/hooks'
-    response = make_rest_post_call(url, headers, body)
-    if response:
-        return True
-    return False
+    url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/hooks'
+    return make_rest_post_call(url, headers, body)
 
 @api_view(['POST'])
 def register_repo(request):
     # TODO - Lock this endpoint down so it's only callable from the future
     # admin panel.
     if request.method == 'POST':
-        site = get_site_from_request(request)
-        if site:
+        serializer = SiteSerializer(data=request.data)
+        if serializer and serializer.is_valid():
+            # TODO - Do this after we have the config instead?
+            site = serializer.save()
             config = get_franklin_config(site)
-            if config:
+            if config and not hasattr(config, 'status_code'):
                 # update DB with any relevant .franklin config itmes here.
-
-                # TODO - We should return the error we get from github if we
-                # fail. Refactor this.
-                success = create_repo_webhook(site)
-                if not success:
-                    return Response(status=status.HTTP_400_BAD_REQUEST)
+                response = create_repo_webhook(site)
+                if not status.is_success(response.status_code):
+                    return Response(status=response.status_code)
+                else:
+                    return Response(status=status.HTTP_201_CREATED)
             else:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-    return Response(status=status.HTTP_201_CREATED)
+                return Response(status=config.status_code)
+    return Response(status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 def deploy_hook(request):
@@ -218,19 +197,20 @@ def deploy_hook(request):
         # request.META.get("HTTP_X_GITHUB_DELIVERY")
 
         if event_type:
-            if event_type == 'push':
-                # For now, we only support push to branch events
-                # TODO - We should also only support pushes to specific branches
-
+            if event_type in ['push', 'create']:
                 github_event = GithubWebhookSerializer(data=request.data)
-                if github_event:
+                if github_event and github_event.is_valid():
                     site = github_event.get_existing_site()
-                    if site and site.is_deployable_event(github_event):
-                        site.save()
-                        # This line helps with testing. We will remove once we add mocking.
-                        if os.environ['ENV'] is not 'test':
-                            site.build()
-                            return Response(status=status.HTTP_201_CREATED)
+                    if site:
+                        environment = site.get_deployable_event(github_event)
+                        if environment:
+                            # This line helps with testing. We will remove once we add mocking.
+                            if os.environ['ENV'] is not 'test':
+                                environment.build()
+                                return Response(status=status.HTTP_201_CREATED)
+                        else:
+                            # Likely a webhook we don't build for.
+                            return Response(status=status.HTTP_200_OK)
                 else:
                     logger.warning("Received an invalid Github Webhook message")
             elif event_type == 'ping':
