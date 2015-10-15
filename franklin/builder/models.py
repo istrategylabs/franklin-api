@@ -44,7 +44,7 @@ class Site(models.Model):
     owner = models.CharField(max_length=100, default='')
     owner_id = models.PositiveIntegerField(blank=True, null=True)
     repo_name = models.CharField(max_length=100)
-    repo_name_id = models.PositiveIntegerField(blank=True, null=True)
+    repo_name_id = models.PositiveIntegerField(unique=True)
     git_hash = models.CharField(max_length=40)
     url = models.CharField(max_length=100, default='', db_index=True)
     path = models.CharField(max_length=100)
