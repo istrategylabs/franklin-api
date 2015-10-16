@@ -173,6 +173,8 @@ def register_repo(request):
     if request.method == 'POST':
         site = SiteSerializer(data=request.data)
         if site and site.is_valid():
+            # TODO - needed? Do this after we have the config?
+            site.save()
             config = get_franklin_config(site)
             if config and not config.status_code:
                 # update DB with any relevant .franklin config itmes here.
