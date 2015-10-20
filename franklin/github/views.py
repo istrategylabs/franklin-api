@@ -14,7 +14,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from builder.models import Site
-from github.serializers import GithubWebhookSerializer, SiteSerializer
+from builder.serializers import SiteSerializer
+from github.serializers import GithubWebhookSerializer
 from users.models import User
 
 client_id = os.environ['CLIENT_ID']
@@ -126,11 +127,11 @@ def make_rest_post_call(url, headers, body):
 #    return repos
 
 def get_franklin_config(site):
-    url = github_base + 'repos/' + site.owner + '/' + site.repo_name + '/contents/.franklin.yml'
+    url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/contents/.franklin.yml'
     #TODO - This will fetch the file from the default master branch
     headers = {
                 'content-type': 'application/json',
-                'Authorization': 'token ' + site.oauth_token
+                'Authorization': 'token ' + site.deploy_key
               }
     config_metadata = make_rest_get_call(url, headers)
 
@@ -152,7 +153,7 @@ def create_repo_webhook(site):
     # TODO - Confirm that a header token is the best/most secure way to go
     headers = {
                 'content-type': 'application/json',
-                'Authorization': 'token ' + site.oauth_token
+                'Authorization': 'token ' + site.deploy_key
               }
     body = {
                 'name': 'web',
@@ -163,7 +164,7 @@ def create_repo_webhook(site):
                                 'content_type': 'json'
                           }
             }
-    url = github_base + 'repos/' + site.owner + '/' + site.repo_name + '/hooks'
+    url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/hooks'
     return make_rest_post_call(url, headers, body)
 
 @api_view(['POST'])
@@ -171,12 +172,12 @@ def register_repo(request):
     # TODO - Lock this endpoint down so it's only callable from the future
     # admin panel.
     if request.method == 'POST':
-        site = SiteSerializer(data=request.data)
-        if site and site.is_valid():
+        serializer = SiteSerializer(data=request.data)
+        if serializer and serializer.is_valid():
             # TODO - needed? Do this after we have the config?
-            site.save()
+            site = serializer.save()
             config = get_franklin_config(site)
-            if config and not config.status_code:
+            if config and not hasattr(config, 'status_code'):
                 # update DB with any relevant .franklin config itmes here.
                 response = create_repo_webhook(site)
                 if not status.is_success(response.status_code):
@@ -203,12 +204,14 @@ def deploy_hook(request):
                 github_event = GithubWebhookSerializer(data=request.data)
                 if github_event and github_event.is_valid():
                     site = github_event.get_existing_site()
-                    if site and site.is_deployable_event(github_event):
-                        site.save()
-                        # This line helps with testing. We will remove once we add mocking.
-                        if os.environ['ENV'] is not 'test':
-                            site.build()
-                            return Response(status=status.HTTP_201_CREATED)
+                    if site:
+                        environment = site.is_deployable_event(github_event)
+                        if environment:
+                            site.save()
+                            # This line helps with testing. We will remove once we add mocking.
+                            if os.environ['ENV'] is not 'test':
+                                environment.build(github_event)
+                                return Response(status=status.HTTP_201_CREATED)
                 else:
                     logger.warning("Received an invalid Github Webhook message")
             elif event_type == 'ping':
@@ -224,4 +227,4 @@ def deploy_hook(request):
     else:
         # Invalid methods are caught at a higher level
         pass
-    return Response(status=status.HTTP_400_BAD_REQUEST)
+    return Response(status=status.HTTP_401_BAD_REQUEST)

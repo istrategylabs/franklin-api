@@ -67,10 +67,12 @@ Now with Github deploys!
 
   ```
   {
-    "owner": "istrategylabs",
-    "owner_id": 607333,
-    "repo_name": "my_project",
-    "repo_name_id": 123456
+    "name": "my_project",
+    "github_id": 123456,
+    "owner": {
+        "name": "istrategylabs",
+        "github_id": 607333
+    }
   }
   ```
 1. create a superuser by running `docker-compose run web python manage.py createsuperuser`

@@ -2,22 +2,29 @@ import os
 
 from rest_framework import serializers
 
-from builder.models import Site
+from builder.models import Owner, Site
+
+
+class OwnerSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Owner
+        fields = ('name', 'github_id')
 
 
 class SiteSerializer(serializers.ModelSerializer):
+    owner = OwnerSerializer()
+    
     class Meta:
         model = Site
-        fields = ('owner', 'owner_id', 'repo_name', 'repo_name_id')
+        fields = ('name', 'github_id', 'owner')
 
-    def save(self):
-        repo_id = self.validated_data.get('repo_name_id', None)
-        site, created = Site.objects.get_or_create(repo_name_id=repo_id)
-        if site:
-            site.owner = self.validated_data.get('owner', site.owner)
-            site.owner_id = self.validated_data.get('owner_id', site.owner_id)
-            site.repo_name = self.validated_data.get('repo_name', site.repo_name)
-            site.oauth_token = os.environ['GITHUB_OAUTH']
-            site.save()
-            return site
-        return None
+    def create(self, validated_data):
+        owner_data = validated_data.pop('owner')
+        owner = Owner.objects.create(**owner_data)
+        site = Site.objects.create(owner=owner, 
+                                   deploy_key=os.environ['GITHUB_OAUTH'], 
+                                   **validated_data)
+        return site
+
+    # TODO - Need def for Update??

@@ -21,9 +21,5 @@ class GithubWebhookSerializer(serializers.Serializer):
     def get_existing_site(self):
         if self.is_valid():
             repo_id = self.validated_data.pop('repository').get('id')
-            git_hash = self.validated_data.pop('head_commit').get('id')
-            site = Site.objects.get(repo_name_id=repo_id)
-            if site:
-                site.git_hash = git_hash
-                return site
+            return Site.objects.get(github_id=repo_id)
         return None
