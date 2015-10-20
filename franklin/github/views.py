@@ -174,9 +174,10 @@ def register_repo(request):
     if request.method == 'POST':
         serializer = SiteSerializer(data=request.data)
         if serializer and serializer.is_valid():
-            # TODO - needed? Do this after we have the config?
+            # TODO - Do this after we have the config instead?
             site = serializer.save()
             config = get_franklin_config(site)
+            print("got config", config)
             if config and not hasattr(config, 'status_code'):
                 # update DB with any relevant .franklin config itmes here.
                 response = create_repo_webhook(site)
@@ -197,22 +198,22 @@ def deploy_hook(request):
         # request.META.get("HTTP_X_GITHUB_DELIVERY")
 
         if event_type:
-            if event_type == 'push':
-                # For now, we only support push to branch events
-                # TODO - We should also only support pushes to specific branches
-
+            if event_type in ['push', 'create']:
                 github_event = GithubWebhookSerializer(data=request.data)
                 if github_event and github_event.is_valid():
                     site = github_event.get_existing_site()
                     if site:
-                        environment = site.is_deployable_event(github_event)
+                        environment = site.get_deployable_event(github_event)
                         if environment:
-                            site.save()
                             # This line helps with testing. We will remove once we add mocking.
                             if os.environ['ENV'] is not 'test':
-                                environment.build(github_event)
+                                environment.build()
                                 return Response(status=status.HTTP_201_CREATED)
+                        else:
+                            # Likely a webhook we don't build for.
+                            return Response(status=status.HTTP_200_OK)
                 else:
+                    print("errors", github_event.errors)
                     logger.warning("Received an invalid Github Webhook message")
             elif event_type == 'ping':
                 # TODO - update the DB with some important info here
@@ -227,4 +228,4 @@ def deploy_hook(request):
     else:
         # Invalid methods are caught at a higher level
         pass
-    return Response(status=status.HTTP_401_BAD_REQUEST)
+    return Response(status=status.HTTP_400_BAD_REQUEST)

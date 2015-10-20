@@ -17,6 +17,8 @@ class RepositorySerializer(serializers.Serializer):
 class GithubWebhookSerializer(serializers.Serializer):
     head_commit = HeadCommitSerializer()
     repository = RepositorySerializer()
+    ref = serializers.CharField(max_length=100)
+    ref_type = serializers.CharField(max_length=100, required=False)
 
     def get_existing_site(self):
         if self.is_valid():

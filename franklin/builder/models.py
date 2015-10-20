@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import requests
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 import sys
@@ -47,13 +48,26 @@ class Site(models.Model):
     github_id = models.PositiveIntegerField(unique=True)
     deploy_key = models.CharField(max_length=255, default='')
 
-    def is_deployable_event(self, github_event):
-        # TODO - add logic here to compare data from the github webhook event
-        # with what we already have in the DB about acceptable deploy events.
-        # e.g. Only if branch 'release' and has a tag formatted 'v ##.##.##'
-        matched_env = self.environments.get(name=self.DEFAULT_ENV)
-        if matched_env:
-            return matched_env
+    def get_deployable_event(self, github_event):
+        git_hash = github_event.validated_data.get('head_commit').get('id')
+        ref_type = github_event.validated_data.get('ref_type')
+        ref = github_event.validated_data.get('ref')
+
+        env_to_deploy = None
+        for env in self.environments.all():
+            if env.deploy_type == Environment.BRANCH and env.branch in ref:
+                env_to_deploy = env
+            elif (env.deploy_type == Environment.TAG and ref_type == 'tag' 
+                and re.match(env.tag_regex, ref)):
+                env_to_deploy = env
+                
+        if env_to_deploy:
+            build, created = env.past_builds.get_or_create(
+                git_hash=git_hash, site=self)
+            if build:
+                env.current_deploy = build
+                env.save()
+                return env_to_deploy
         return None
     
     def save(self, *args, **kwargs):
@@ -147,18 +161,17 @@ class Environment(models.Model):
     deploy_type = models.CharField(
         max_length=3, choices=DEPLOY_CHOICES, default=BRANCH)
     branch = models.CharField(max_length=100, default='master')
-    tag_regex = models.CharField(max_length=100, default='')
-    url = models.CharField(max_length=100, default='', db_index=True)
+    tag_regex = models.CharField(max_length=100, blank=True)
+    url = models.CharField(
+        max_length=100, default='', db_index=True, blank=True)
     current_deploy = models.ForeignKey(
-        Build, related_name='deployments', null=True)
-    past_builds = models.ManyToManyField(Build, related_name='environments')
+        Build, related_name='deployments', null=True, blank=True)
+    past_builds = models.ManyToManyField(
+        Build, related_name='environments', blank=True)
     status = models.CharField(
         max_length=3, choices=STATUS_CHOICES, default=REGISTERED)
     
-    def build(self, github_event):
-        git_hash = github_event.validated_data.pop('head_commit').get('id')
-        self.current_deploy = self.past_builds.get_or_create(git_hash=git_hash)
-
+    def build(self):
         url = os.environ['BUILDER_URL']
         headers = {'content-type': 'application/json'}
         body = {
@@ -194,13 +207,14 @@ class Environment(models.Model):
         self.save()
 
     def save(self, *args, **kwargs):
-        if self.name == self.site.DEFAULT_ENV:
-            self.url = "{0}.{1}".format(self.site.name, 
-                                        os.environ['BASE_URL'])
-        else:
-            self.url = "{0}-{1}.{2}".format(self.site.name, 
-                                            self.name, 
+        if self.current_deploy:
+            if self.name == self.site.DEFAULT_ENV:
+                self.url = "{0}.{1}".format(self.site.name, 
                                             os.environ['BASE_URL'])
+            else:
+                self.url = "{0}-{1}.{2}".format(self.site.name, 
+                                                self.name, 
+                                                os.environ['BASE_URL'])
         super(Environment, self).save(*args, **kwargs)
     
     def __str__(self):
