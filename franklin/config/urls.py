@@ -25,6 +25,6 @@ urlpatterns = [
     url(r'^auth/', auth, name='auth'),
     url(r'^callback/', callback, name='callback'),
     url(r'^deployed/', deploy_hook, name='deploy'),
-    url(r'^register/', register_repo, name='register'),
+    url(r'^register/$', register_repo, name='register'),
     url(r'^health/$', health, name='health'),
 ]

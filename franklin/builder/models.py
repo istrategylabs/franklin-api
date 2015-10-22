@@ -49,19 +49,19 @@ class Site(models.Model):
     deploy_key = models.CharField(max_length=255, default='')
 
     def get_deployable_event(self, github_event):
-        git_hash = github_event.validated_data.get('head_commit').get('id')
-        ref_type = github_event.validated_data.get('ref_type')
-        ref = github_event.validated_data.get('ref')
+        git_hash = github_event.get_event_hash()
+        event = github_event.get_change_location()
+        is_tag_event = github_event.is_tag_event()
 
         env_to_deploy = None
         for env in self.environments.all():
-            if env.deploy_type == Environment.BRANCH and env.branch in ref:
+            if env.deploy_type == Environment.BRANCH and env.branch in event:
                 env_to_deploy = env
-            elif (env.deploy_type == Environment.TAG and ref_type == 'tag' 
-                and re.match(env.tag_regex, ref)):
+            elif (env.deploy_type == Environment.TAG and is_tag_event 
+                and re.match(env.tag_regex, event)):
                 env_to_deploy = env
                 
-        if env_to_deploy:
+        if env_to_deploy and git_hash:
             build, created = env.past_builds.get_or_create(
                 git_hash=git_hash, site=self)
             if build:

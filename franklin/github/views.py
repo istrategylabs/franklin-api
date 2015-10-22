@@ -75,7 +75,7 @@ def make_rest_get_call(url, headers):
 
     if response is not None:
         if not status.is_success(response.status_code):
-            logger.warn('Bad GET response code of', response.status_code)
+            logger.warn('Bad GET response code of %s', response.status_code)
     return response
 
 def make_rest_post_call(url, headers, body):
@@ -89,7 +89,7 @@ def make_rest_post_call(url, headers, body):
 
     if response is not None:
         if not status.is_success(response.status_code):
-            logger.warn('Bad POST response code of', response.status_code)
+            logger.warn('Bad POST response code of %s', response.status_code)
     return response
 
 # Not currently used. but it works.
@@ -177,17 +177,16 @@ def register_repo(request):
             # TODO - Do this after we have the config instead?
             site = serializer.save()
             config = get_franklin_config(site)
-            print("got config", config)
             if config and not hasattr(config, 'status_code'):
                 # update DB with any relevant .franklin config itmes here.
                 response = create_repo_webhook(site)
                 if not status.is_success(response.status_code):
                     return Response(status=response.status_code)
+                else:
+                    return Response(status=status.HTTP_201_CREATED)
             else:
                 return Response(status=config.status_code)
-        else:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-    return Response(status=status.HTTP_201_CREATED)
+    return Response(status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 def deploy_hook(request):
@@ -213,7 +212,6 @@ def deploy_hook(request):
                             # Likely a webhook we don't build for.
                             return Response(status=status.HTTP_200_OK)
                 else:
-                    print("errors", github_event.errors)
                     logger.warning("Received an invalid Github Webhook message")
             elif event_type == 'ping':
                 # TODO - update the DB with some important info here

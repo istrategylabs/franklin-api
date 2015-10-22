@@ -16,9 +16,10 @@ class OwnerSerializer(serializers.ModelSerializer):
             },
         }
 
+
 class SiteSerializer(serializers.ModelSerializer):
     owner = OwnerSerializer()
-    
+
     class Meta:
         model = Site
         fields = ('name', 'github_id', 'owner')
@@ -40,15 +41,12 @@ class SiteSerializer(serializers.ModelSerializer):
         owner_id = owner_data.get('github_id', None)
         repo_id = validated_data.get('github_id', None)
         if owner_id and repo_id:
-            owner, o_created = Owner.objects.get_or_create(github_id=owner_id)
+            owner, o_created = Owner.objects.update_or_create(
+                github_id=owner_id, defaults=owner_data)
             if owner:
-                owner.name = owner_data.get('name')
-                owner.save()
-                site, s_created = Site.objects.get_or_create(
-                    github_id=repo_id, owner=owner)
+                site, s_created = Site.objects.update_or_create(
+                    github_id=repo_id, deploy_key=os.environ['GITHUB_OAUTH'], 
+                    owner=owner, defaults=validated_data)
                 if site:
-                    site.name = validated_data.get('name')
-                    site.deploy_key = os.environ['GITHUB_OAUTH']
-                    site.save()
                     return site
         return None
