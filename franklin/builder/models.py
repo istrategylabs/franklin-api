@@ -15,6 +15,7 @@ from rest_framework import status
 
 logger = logging.getLogger(__name__)
 
+
 class Owner(models.Model):
     """ Represents a github user or organization that owns repos
 
@@ -53,21 +54,24 @@ class Site(models.Model):
         event = github_event.get_change_location()
         is_tag_event = github_event.is_tag_event()
 
-        env_to_deploy = None
+        build = None
         for env in self.environments.all():
             if env.deploy_type == Environment.BRANCH and env.branch in event:
-                env_to_deploy = env
+                build, created = env.past_builds.get_or_create(
+                    git_hash=git_hash, branch=env.branch, site=self)
+                break
             elif (env.deploy_type == Environment.TAG and is_tag_event 
-                and re.match(env.tag_regex, event)):
-                env_to_deploy = env
+                    and re.match(env.tag_regex, event)):
+                clean_tag = re.sub('[^a-zA-Z0-9]', '', event)
+                print('Tag %s is now %s', event, clean_tag)
+                build, created = env.past_builds.get_or_create(
+                    tag=event, site=self)
+                break
                 
-        if env_to_deploy and git_hash:
-            build, created = env.past_builds.get_or_create(
-                git_hash=git_hash, site=self)
-            if build:
-                env.current_deploy = build
-                env.save()
-                return env_to_deploy
+        if build:
+            env.current_deploy = build
+            env.save()
+            return env
         return None
     
     def save(self, *args, **kwargs):
@@ -88,27 +92,36 @@ class Build(models.Model):
     can be referenced by the HTTP server for routing
 
     :param site: Reference to the project for this build instance
-    :param git_hash: The git hash of the deployed code
+    :param git_hash: If a branch build, the git hash of the deployed code
+    :param branch: If a branch build, the name of the branch
+    :param tag: If a tag build, the name of the tag
     :param created: Date this code was built
     :param path: The path of the site on the static server
     """
 
     site = models.ForeignKey(Site, related_name='builds')
-    git_hash = models.CharField(max_length=40)
+    git_hash = models.CharField(max_length=40, blank=True, null=True)
+    branch = models.CharField(max_length=100, blank=True, null=True)
+    tag = models.CharField(max_length=100, blank=True, null=True)
     created = models.DateTimeField(editable=False)
     path = models.CharField(max_length=100)
     
     def save(self, *args, **kwargs):
         base_path = os.environ['BASE_PROJECT_PATH']
-        self.path = "{0}/{1}/{2}/{3}".format(base_path, 
-                                             self.site.owner.name, 
-                                             self.site.name,
-                                             self.git_hash)
+        if self.tag:
+            clean_tag = re.sub('[^a-zA-Z0-9]', '', self.tag)
+            self.path = "{0}/{1}/{2}/{3}".format(
+                base_path, self.site.owner.name, self.site.name, clean_tag)
+        else:
+            self.path = "{0}/{1}/{2}/{3}".format(
+                base_path, self.site.owner.name, self.site.name, self.git_hash)
         if not self.id:
             self.created = timezone.now()
         super(Build, self).save(*args, **kwargs)
     
     def __str__(self):
+        if self.tag:
+            return '%s %s' % (self.site.name, self.tag)
         return '%s %s' % (self.site.name, self.git_hash)
     
     class Meta(object):
@@ -175,7 +188,9 @@ class Environment(models.Model):
         url = os.environ['BUILDER_URL']
         headers = {'content-type': 'application/json'}
         body = {
-                    "github_token": self.site.deploy_key,
+                    "deploy_key": self.site.deploy_key,
+                    "branch": self.current_deploy.branch,
+                    "tag": self.current_deploy.tag,
                     "git_hash": self.current_deploy.git_hash,
                     "repo_owner": self.site.owner.name,
                     "path": self.current_deploy.path,

@@ -53,5 +53,5 @@ class GithubWebhookSerializer(serializers.Serializer):
         if self.validated_data:
             # Depending on the event, 'ref' will contain the name of the branch
             # code was push to, or the name of the created tag
-            return github_event.validated_data.get('ref', None)
+            return self.validated_data.get('ref', None)
         return None
