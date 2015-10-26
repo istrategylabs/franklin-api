@@ -27,8 +27,9 @@ Now with Github deploys!
       SECRET_KEY=<your_secret_key>
       BUILDER_URL=<franklin_builder_url>
       ENV='local'
-      GITHUB_OAUTH=<github_oauth_token>
       API_BASE_URL=<franklin_api_url>
+      SOCIAL_AUTH_GITHUB_KEY=<github_client_id>
+      SOCIAL_AUTH_GITHUB_SECRET=<github_client_secret>
     ```
 - Projects you wish to be deployed by franklin will need a `.franklin` file in their root
 
@@ -54,7 +55,13 @@ Now with Github deploys!
 1. Test it by dropping the url in any web browser on any computer. The response and ngrok server logs should record a rejected GET request on an endpoint that only accepts POST.
 1. Bonus: You can also do the above for [franklin-build](https://github.com/istrategylabs/franklin-build), and use the ngrok endpoint as your `BUILDER_URL` and `API_BASE_URL` in your `.env`. Do this before starting `franklin-api`. ngrok can manage both endpoints at the same time. You could also point your local `franklin-api` to your test environment for `franklin-build`. Thus, you'll be working with production ready code while you prototype your changes here. 
 
-### Obtain a Github OAuth Token
+### Configure Github Social Signin
+1. Create a personal application for testing github's api. [github settings](https://github.com/settings/applications)
+1. The callback URL should look something like `http://192.168.99.100:5000/complete/github`
+1. Make sure there is no trailing slash on the callback URL
+1. Set the `Client ID` and `Client Secret` in your config above
+1. Confirm configuration is working by visiting your running app in a browser (e.g. `http://192.168.99.100:5000/`) and logging in with github 
+### Obtain a Github OAuth Token -> Soon to be depricated. Social Signin will do this for us
 1. Log into Github
 1. Navigate to `Settings --> Personal Access Tokens --> Generate New Token`
 1. Use the default permissions.

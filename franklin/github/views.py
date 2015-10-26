@@ -15,7 +15,7 @@ from rest_framework.response import Response
 
 from builder.models import Site
 from builder.serializers import SiteSerializer
-from github.serializers import GithubWebhookSerializer
+from .serializers import GithubWebhookSerializer
 from users.models import User
 
 client_id = os.environ['CLIENT_ID']
@@ -30,10 +30,11 @@ def auth(request):
     context = {'client_id': client_id}
     return render(request, 'github/auth.html', context)
 
+"""
 def callback(request):
-    """ Handles oauth callback from github and creates a new user
-    object with their Github username and newly obtained access_token
-    """
+    #Handles oauth callback from github and creates a new user
+    #object with their Github username and newly obtained access_token
+    
     session_code = request.GET['code']
 
     payload = {
@@ -63,6 +64,7 @@ def callback(request):
     )
 
     return HttpResponse(status=200)
+"""
 
 def make_rest_get_call(url, headers):
     response = None
@@ -92,39 +94,41 @@ def make_rest_post_call(url, headers, body):
             logger.warn('Bad POST response code of %s', response.status_code)
     return response
 
+"""
 # Not currently used. but it works.
-#def get_owners_repos(owner_name):
-#    have_next_page = True
-#    url = github_base + 'orgs/' + owner_name + '/repos?per_page=100'
-#    # TODO - Confirm that a header token is the best/most secure way to go
-#    headers = {
-#                'content-type': 'application/json',
-#                'Authorization': 'token ' + oauth
-#              }
-#    repos = []
-#
-#    while have_next_page:
-#        response = None
-#        have_next_page = False # when in doubt, we'll leave the loop after 1
-#        response = make_rest_get_call(url, headers)
-#
-#        if response is not None:
-#            # Add all of the repos to our list
-#            for repo in response.json():
-#                repo_data = {}
-#                repo_data['id'] = repo['id']
-#                repo_data['name'] = repo['name']
-#                repos.append(repo_data)
-#
-#            # If the header has a paging link called 'next', update our url
-#            # and continue with the while loop
-#            if response.links and response.links.get('next', None):
-#                url = response.links['next']['url']
-#                have_next_page = True
-#
-#    if not repos:
-#        logger.error('Failed to find repos for owner', owner_name)
-#    return repos
+def get_owners_repos(owner_name):
+    have_next_page = True
+    url = github_base + 'orgs/' + owner_name + '/repos?per_page=100'
+    # TODO - Confirm that a header token is the best/most secure way to go
+    headers = {
+                'content-type': 'application/json',
+                'Authorization': 'token ' + oauth
+              }
+    repos = []
+
+    while have_next_page:
+        response = None
+        have_next_page = False # when in doubt, we'll leave the loop after 1
+        response = make_rest_get_call(url, headers)
+
+        if response is not None:
+            # Add all of the repos to our list
+            for repo in response.json():
+                repo_data = {}
+                repo_data['id'] = repo['id']
+                repo_data['name'] = repo['name']
+                repos.append(repo_data)
+
+            # If the header has a paging link called 'next', update our url
+            # and continue with the while loop
+            if response.links and response.links.get('next', None):
+                url = response.links['next']['url']
+                have_next_page = True
+
+    if not repos:
+        logger.error('Failed to find repos for owner', owner_name)
+    return repos
+"""
 
 def get_franklin_config(site):
     url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/contents/.franklin.yml'
@@ -172,6 +176,17 @@ def register_repo(request):
     # TODO - Lock this endpoint down so it's only callable from the future
     # admin panel.
     if request.method == 'POST':
+        """
+        # Calling github will look something like this
+        user = User.objects.get(...)
+        social = user.social_auth.get(provider='google-oauth2')
+        response = requests.get(
+                    'https://www.googleapis.com/plus/v1/people/me/people/visible',
+                        params={'access_token':
+                            social.extra_data['access_token']}
+                        )
+        friends = response.json()['items']
+        """
         serializer = SiteSerializer(data=request.data)
         if serializer and serializer.is_valid():
             # TODO - Do this after we have the config instead?

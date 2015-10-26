@@ -5,3 +5,4 @@ requests==2.7.0
 djangorestframework==3.2.2
 gunicorn==19.3.0
 pyyaml==3.11
+python-social-auth==0.2.13

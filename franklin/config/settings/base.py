@@ -23,6 +23,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.environ['SECRET_KEY']
 
 # SECURITY WARNING: don't run with debug turned on in production!
+
+# Github api creds
+SOCIAL_AUTH_GITHUB_KEY = os.environ['SOCIAL_AUTH_GITHUB_KEY']
+SOCIAL_AUTH_GITHUB_SECRET = os.environ['SOCIAL_AUTH_GITHUB_SECRET']
+
 DEBUG = True
 
 ALLOWED_HOSTS = []
@@ -37,12 +42,15 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'github',
-    'users',
-    'builder',
 
     # third part apps
     'rest_framework',
+    'social.apps.django_app.default',
+
+    # Local apps
+    'github',
+    'users',
+    'builder',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -69,10 +77,19 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'social.apps.django_app.context_processors.backends',
+                'social.apps.django_app.context_processors.login_redirect',
             ],
         },
     },
 ]
+
+AUTHENTICATION_BACKENDS = (
+    'social.backends.github.GithubOAuth2',
+    'django.contrib.auth.backends.ModelBackend'
+)
+
+SOCIAL_AUTH_GITHUB_SCOPE = ['user', 'repo']
 
 WSGI_APPLICATION = 'config.wsgi.application'
 

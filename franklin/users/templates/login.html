@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block main %}
+<div>
+    <h1 class="">Sign In</h1>
+    <a class="" href="{% url 'social:begin' 'github' %}?next={{ next }}">
+        <span class="icon-github-sign-in"></span>
+        <span>Sign in with Github</span>
+    </a>
+</div>
+{% endblock main %}

@@ -63,7 +63,6 @@ class Site(models.Model):
             elif (env.deploy_type == Environment.TAG and is_tag_event 
                     and re.match(env.tag_regex, event)):
                 clean_tag = re.sub('[^a-zA-Z0-9]', '', event)
-                print('Tag %s is now %s', event, clean_tag)
                 build, created = env.past_builds.get_or_create(
                     tag=event, site=self)
                 break
