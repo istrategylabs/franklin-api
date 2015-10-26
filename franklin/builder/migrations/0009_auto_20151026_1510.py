@@ -14,8 +14,10 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Build',
             fields=[
-                ('id', models.AutoField(auto_created=True, verbose_name='ID', primary_key=True, serialize=False)),
-                ('git_hash', models.CharField(max_length=40)),
+                ('id', models.AutoField(serialize=False, verbose_name='ID', auto_created=True, primary_key=True)),
+                ('git_hash', models.CharField(blank=True, null=True, max_length=40)),
+                ('branch', models.CharField(blank=True, null=True, max_length=100)),
+                ('tag', models.CharField(blank=True, null=True, max_length=100)),
                 ('created', models.DateTimeField(editable=False)),
                 ('path', models.CharField(max_length=100)),
             ],
@@ -27,16 +29,16 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Environment',
             fields=[
-                ('id', models.AutoField(auto_created=True, verbose_name='ID', primary_key=True, serialize=False)),
+                ('id', models.AutoField(serialize=False, verbose_name='ID', auto_created=True, primary_key=True)),
                 ('name', models.CharField(default='', max_length=100)),
                 ('description', models.TextField(blank=True, default='', max_length=20480)),
-                ('deploy_type', models.CharField(default='BCH', choices=[('BCH', 'Any push to a branch'), ('TAG', 'Any commit matching a tag regex'), ('PRO', 'Manually from a lower environment')], max_length=3)),
+                ('deploy_type', models.CharField(default='BCH', max_length=3, choices=[('BCH', 'Any push to a branch'), ('TAG', 'Any commit matching a tag regex'), ('PRO', 'Manually from a lower environment')])),
                 ('branch', models.CharField(default='master', max_length=100)),
-                ('tag_regex', models.CharField(default='', max_length=100)),
-                ('url', models.CharField(default='', max_length=100, db_index=True)),
-                ('status', models.CharField(default='REG', choices=[('REG', 'Webhook Registered'), ('BLD', 'Building Now'), ('SUC', 'Deploy Succeeded'), ('FAL', 'Deploy Failed')], max_length=3)),
-                ('current_deploy', models.ForeignKey(related_name='deployments', to='builder.Build', null=True)),
-                ('past_builds', models.ManyToManyField(to='builder.Build', related_name='environments')),
+                ('tag_regex', models.CharField(blank=True, max_length=100)),
+                ('url', models.CharField(blank=True, default='', max_length=100, db_index=True)),
+                ('status', models.CharField(default='REG', max_length=3, choices=[('REG', 'Webhook Registered'), ('BLD', 'Building Now'), ('SUC', 'Deploy Succeeded'), ('FAL', 'Deploy Failed')])),
+                ('current_deploy', models.ForeignKey(blank=True, related_name='deployments', to='builder.Build', null=True)),
+                ('past_builds', models.ManyToManyField(blank=True, related_name='environments', to='builder.Build')),
             ],
             options={
                 'verbose_name': 'Environment',
@@ -46,7 +48,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Owner',
             fields=[
-                ('id', models.AutoField(auto_created=True, verbose_name='ID', primary_key=True, serialize=False)),
+                ('id', models.AutoField(serialize=False, verbose_name='ID', auto_created=True, primary_key=True)),
                 ('name', models.CharField(max_length=100)),
                 ('github_id', models.PositiveIntegerField(unique=True)),
             ],
@@ -58,11 +60,11 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Site',
             fields=[
-                ('id', models.AutoField(auto_created=True, verbose_name='ID', primary_key=True, serialize=False)),
+                ('id', models.AutoField(serialize=False, verbose_name='ID', auto_created=True, primary_key=True)),
                 ('name', models.CharField(max_length=100)),
                 ('github_id', models.PositiveIntegerField(unique=True)),
                 ('deploy_key', models.CharField(default='', max_length=255)),
-                ('owner', models.ForeignKey(to='builder.Owner', related_name='sites')),
+                ('owner', models.ForeignKey(related_name='sites', to='builder.Owner')),
             ],
             options={
                 'verbose_name': 'Site',
@@ -72,12 +74,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='environment',
             name='site',
-            field=models.ForeignKey(to='builder.Site', related_name='environments'),
+            field=models.ForeignKey(related_name='environments', to='builder.Site'),
         ),
         migrations.AddField(
             model_name='build',
             name='site',
-            field=models.ForeignKey(to='builder.Site', related_name='builds'),
+            field=models.ForeignKey(related_name='builds', to='builder.Site'),
         ),
         migrations.AlterUniqueTogether(
             name='environment',
