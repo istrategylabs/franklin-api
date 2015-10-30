@@ -1,8 +1,6 @@
 import json
 import logging
 import os
-import requests
-from requests.exceptions import ConnectionError, HTTPError, Timeout
 import sys
 import yaml
 
@@ -13,10 +11,10 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from builder.helpers import make_rest_get_call, make_rest_post_call 
 from builder.models import Site
 from builder.serializers import SiteSerializer
 from .serializers import GithubWebhookSerializer
-from users.models import User
 
 client_id = os.environ['CLIENT_ID']
 client_secret = os.environ['CLIENT_SECRET']
@@ -64,70 +62,6 @@ def callback(request):
     )
 
     return HttpResponse(status=200)
-"""
-
-def make_rest_get_call(url, headers):
-    response = None
-    try:
-        response = requests.get(url, headers=headers)
-    except (ConnectionError, HTTPError, Timeout) as e:
-        logger.error('REST GET Connection exception : %s', e)
-    except:
-        logger.error('Unexpected REST GET error: %s', sys.exc_info()[0])
-
-    if response is not None:
-        if not status.is_success(response.status_code):
-            logger.warn('Bad GET response code of %s', response.status_code)
-    return response
-
-def make_rest_post_call(url, headers, body):
-    response = None
-    try:
-        response = requests.post(url, data=json.dumps(body), headers=headers)
-    except (ConnectionError, HTTPError, Timeout) as e:
-        logger.error('REST POST Connection exception : %s', e)
-    except:
-        logger.error('Unexpected REST POST error: %s', sys.exc_info()[0])
-
-    if response is not None:
-        if not status.is_success(response.status_code):
-            logger.warn('Bad POST response code of %s', response.status_code)
-    return response
-
-"""
-# Not currently used. but it works.
-def get_owners_repos(owner_name):
-    have_next_page = True
-    url = github_base + 'orgs/' + owner_name + '/repos?per_page=100'
-    # TODO - Confirm that a header token is the best/most secure way to go
-    headers = {
-                'content-type': 'application/json',
-                'Authorization': 'token ' + oauth
-              }
-    repos = []
-
-    while have_next_page:
-        response = None
-        have_next_page = False # when in doubt, we'll leave the loop after 1
-        response = make_rest_get_call(url, headers)
-
-        if response is not None:
-            # Add all of the repos to our list
-            for repo in response.json():
-                repo_data = {}
-                repo_data['id'] = repo['id']
-                repo_data['name'] = repo['name']
-                repos.append(repo_data)
-
-            # If the header has a paging link called 'next', update our url
-            # and continue with the while loop
-            if response.links and response.links.get('next', None):
-                url = response.links['next']['url']
-                have_next_page = True
-
-    if not repos:
-        logger.error('Failed to find repos for owner', owner_name)
-    return repos
 """
 
 def get_franklin_config(site):

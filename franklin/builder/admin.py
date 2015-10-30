@@ -1,8 +1,10 @@
 from django.contrib import admin
-from builder.models import Build, Environment, Owner, Site
+
+from .models import BranchBuild, Environment, Owner, Site, TagBuild
 
 
-admin.site.register(Build)
+admin.site.register(BranchBuild)
 admin.site.register(Environment)
 admin.site.register(Owner)
 admin.site.register(Site)
+admin.site.register(TagBuild)

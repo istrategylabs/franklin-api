@@ -143,8 +143,6 @@ class BuildTestCase(TestCase):
     def test_env_url_exists(self):
         """ Tests that the url exists after the environment has a deployment
         """
-        #print(self.tag_build)
-        #base_object = Build.objects.get(pk=self.tag_build.pk)
         self.env.current_deploy = self.tag_build
         self.env.save()
         expected = "{name}.{base_domain}".format(

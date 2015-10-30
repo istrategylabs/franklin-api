@@ -1,15 +1,71 @@
+import logging
+from django.conf import settings
+from django.dispatch import receiver
 from django.db import models
+from django.db.models.signals import post_save
+from django.utils.translation import ugettext as _
+
+from builder.helpers import make_rest_get_call 
+
+github_base = 'https://api.github.com/'
+logger = logging.getLogger(__name__)
 
 
-class User(models.Model):
-    """ Represents an authenticated 'user' that allows us to utilize Github
-    webhooks from their repos.
+class UserDetails(models.Model):
+    """ Extra details and functions attached to the default user created with
+    github social signin
 
-    :param username: The user's unique username (taken from github)
-    :param github_token: The user's stored github auth token
+    :param user: FK to a unique user
     """
-    username = models.CharField(max_length=30)
-    github_token = models.CharField(max_length=30)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='details')
 
-    def __unicode__(self):
-        return self.username
+    def get_user_repos(self):
+        social = self.user.social_auth.get(provider='github')
+        have_next_page = True
+        url = github_base + 'user/repos?per_page=100'
+        # TODO - Confirm that a header token is the best/most secure way to go
+        headers = {
+                    'content-type': 'application/json',
+                    'Authorization': 'token ' + social.extra_data['access_token']
+                  }
+        repos = []
+
+        while have_next_page:
+            response = None
+            have_next_page = False # when in doubt, we'll leave the loop after 1
+            response = make_rest_get_call(url, headers)
+
+            if response is not None:
+                # Add all of the repos to our list
+                for repo in response.json():
+                    repo_data = {}
+                    repo_data['id'] = repo['id']
+                    repo_data['name'] = repo['name']
+                    repo_data['url'] = repo['html_url']
+                    repo_data['owner'] = {}
+                    repo_data['owner']['name'] = repo['owner']['login']
+                    repo_data['owner']['id'] = repo['owner']['id']
+                    repos.append(repo_data)
+
+                # If the header has a paging link called 'next', update our url
+                # and continue with the while loop
+                if response.links and response.links.get('next', None):
+                    url = response.links['next']['url']
+                    have_next_page = True
+
+        if not repos:
+            logger.error('Failed to find repos for user', user.username)
+        return repos
+
+    def __str__(self):
+        return self.user.username
+    
+    class Meta(object):
+        verbose_name = _('Detail')
+        verbose_name_plural = _('Details')
+
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def create_details_for_new_user(sender, created, instance, **kwargs):
+    if created:
+        UserDetails.objects.create(user=instance)

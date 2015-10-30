@@ -94,9 +94,13 @@ class Build(models.Model):
     """
 
     site = models.ForeignKey(Site, related_name='builds')
-    created = models.DateTimeField(editable=False)
-    path = models.CharField(max_length=100)
-    
+    created = models.DateTimeField(auto_now_add=True, editable=False)
+    path = models.CharField(max_length=100, blank=True)
+
+    def get_path(self, owner, site, name):
+        base = os.environ['BASE_PROJECT_PATH']
+        return "{0}/{1}/{2}/{3}".format(base, owner, site, name)
+
 
 class TagBuild(Build):
     """ Flavor of build that was created from a tag
@@ -106,20 +110,17 @@ class TagBuild(Build):
     tag = models.CharField(max_length=100, unique=True)
 
     def save(self, *args, **kwargs):
-        base_path = os.environ['BASE_PROJECT_PATH']
         clean_tag = re.sub('[^a-zA-Z0-9]', '', self.tag)
-        self.path = "{0}/{1}/{2}/{3}".format(
-            base_path, self.site.owner.name, self.site.name, clean_tag)
-        if not self.id:
-            self.created = timezone.now()
+        self.path = self.get_path(
+                self.site.owner.name, self.site.name, clean_tag)
         super(TagBuild, self).save(*args, **kwargs)
 
     def __str__(self):
         return '%s %s' % (self.site.name, self.tag)
     
     class Meta(object):
-        verbose_name = _('TagBuild')
-        verbose_name_plural = _('TagBuilds')
+        verbose_name = _('Tag Build')
+        verbose_name_plural = _('Tag Builds')
 
 
 class BranchBuild(Build):
@@ -132,19 +133,16 @@ class BranchBuild(Build):
     branch = models.CharField(max_length=100)
 
     def save(self, *args, **kwargs):
-        base_path = os.environ['BASE_PROJECT_PATH']
-        self.path = "{0}/{1}/{2}/{3}".format(
-            base_path, self.site.owner.name, self.site.name, self.git_hash)
-        if not self.id:
-            self.created = timezone.now()
+        self.path = self.get_path(
+                self.site.owner.name, self.site.name, self.git_hash)
         super(BranchBuild, self).save(*args, **kwargs)
 
     def __str__(self):
         return '%s %s' % (self.site.name, self.git_hash)
     
     class Meta(object):
-        verbose_name = _('BranchBuild')
-        verbose_name_plural = _('BranchBuilds')
+        verbose_name = _('Branch Build')
+        verbose_name_plural = _('Branch Builds')
         unique_together = ('git_hash', 'branch')
 
 

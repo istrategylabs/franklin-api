@@ -3,5 +3,14 @@
 {% block main %}
 <div>
     <h1 class="">Welcome {{ request.user.get_username }}!</h1>
+    {% if repos %}
+    {% for repo in repos %}
+    <div class="">
+        <a class="" href="{{ repo.url }}">
+            {{ repo.name }}
+        </a>
+    </div>
+    {% endfor %}
+    {% endif %}
 </div>
 {% endblock main %}
