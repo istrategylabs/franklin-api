@@ -19,7 +19,16 @@ class UserDetails(models.Model):
     """
     user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='details')
 
+    def get_github_id(self):
+        social = self.user.social_auth.get(provider='github')
+        if social:
+            return social.uid
+        return None
+
     def get_user_repos(self):
+        # TODO - This call is somewhat inefficient and we currently access this
+        # data multiple times. Either store it in the DB (raw?) or cache it
+        # somehow so we aren't making constant calls to github.
         social = self.user.social_auth.get(provider='github')
         have_next_page = True
         url = github_base + 'user/repos?per_page=100'

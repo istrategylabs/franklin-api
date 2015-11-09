@@ -105,11 +105,10 @@ def create_repo_webhook(site):
     url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/hooks'
     return make_rest_post_call(url, headers, body)
 
-@api_view(['POST'])
-def register_repo(request):
+class RegisterRepo(APIView):
     # TODO - Lock this endpoint down so it's only callable from the future
     # admin panel.
-    if request.method == 'POST':
+    def post(self, request):
         """
         # Calling github will look something like this
         user = User.objects.get(...)
@@ -135,7 +134,12 @@ def register_repo(request):
                     return Response(status=status.HTTP_201_CREATED)
             else:
                 return Response(status=config.status_code)
-    return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request):
+        print("request data is", request.data)
+        return Response(status=status.HTTP_201_CREATED)
+
 
 @api_view(['POST'])
 def deploy_hook(request):

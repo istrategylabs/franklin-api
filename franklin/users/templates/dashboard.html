@@ -4,13 +4,39 @@
 <div>
     <h1 class="">Welcome {{ request.user.get_username }}!</h1>
     {% if repos %}
-    {% for repo in repos %}
-    <div class="">
-        <a class="" href="{{ repo.url }}">
-            {{ repo.name }}
-        </a>
-    </div>
-    {% endfor %}
+
+
+        ACTIVE REPOS FROM GITHUB
+        {% for site in object_list %}
+        <form class="" method="delete" action="{% url 'unregister' %}">
+            {% csrf_token %}
+            <input type="hidden" name="id" value="{{ site.id }}">
+            <div class="">
+                <a href="" class="">
+                    {{ site.name }}
+                </a>
+                <button class="" type="submit">
+                    Turn off deployments
+                </button>
+            </div>
+        </form>
+        {% endfor %}
+        OTHER REPOS FROM GITHUB
+        {% for repo in repos %}
+        <form class="" method="post" action"">
+            {% csrf_token %}
+            <input type="hidden" name="id" value="{{ repo.id }}">
+            <input type="hidden" name="name" value="{{ repo.name }}">
+            <div class="">
+                <a href="{{ repo.url }}" class="">
+                    {{ repo.name }}
+                </a>
+                <button class="" type="submit">
+                    Setup for deployments
+                </button>
+            </div>
+        </form>
+        {% endfor %}
     {% endif %}
 </div>
 {% endblock main %}
