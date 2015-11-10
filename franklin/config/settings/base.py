@@ -45,7 +45,9 @@ INSTALLED_APPS = (
 
     # third part apps
     'rest_framework',
+    'oauth2_provider',
     'social.apps.django_app.default',
+    'rest_framework_social_oauth2',
 
     # Local apps
     'github',
@@ -85,7 +87,11 @@ TEMPLATES = [
 ]
 
 AUTHENTICATION_BACKENDS = (
+    # Github python-social-auth
     'social.backends.github.GithubOAuth2',
+    # django-rest-framework-social-oauth2
+    'rest_framework_social_oauth2.backends.DjangoOAuth2',
+    # django
     'django.contrib.auth.backends.ModelBackend'
 )
 
@@ -122,7 +128,11 @@ STATIC_ROOT = os.path.join(BASE_DIR, '../../staticfiles')
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'oauth2_provider.ext.rest_framework.OAuth2Authentication',
+        'rest_framework_social_oauth2.authentication.SocialAuthentication',
     )
 }
 

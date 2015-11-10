@@ -19,16 +19,11 @@ from django.contrib import admin
 from .views import health
 
 from github.views import deploy_hook, register_repo
-from users.views import UserLogin
 
 urlpatterns = [
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^$', UserLogin.as_view()),
-    url(r'^login/$', UserLogin.as_view(), name='login'),
-    url(r'^users/', include('users.urls', namespace='user')),
     url(r'^deployed/', deploy_hook, name='deploy'),
     url(r'^register/$', register_repo, name='register'),
     url(r'^health/$', health, name='health'),
-    url('', include('social.apps.django_app.urls', namespace='social')),
-    url('', include('django.contrib.auth.urls', namespace='auth')),
+    url(r'^auth/', include('rest_framework_social_oauth2.urls')),
 ]
