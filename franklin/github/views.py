@@ -1,17 +1,15 @@
-import json
 import logging
 import os
-import sys
 import yaml
 
 from django.shortcuts import render
 from django.http import HttpResponse
 
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from builder.helpers import make_rest_get_call, make_rest_post_call 
+from builder.helpers import make_rest_get_call, make_rest_post_call, GithubOnly 
 from builder.models import Site
 from builder.serializers import SiteSerializer
 from .serializers import GithubWebhookSerializer
@@ -64,12 +62,14 @@ def callback(request):
     return HttpResponse(status=200)
 """
 
-def get_franklin_config(site):
+def get_franklin_config(site, user):
     url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/contents/.franklin.yml'
     #TODO - This will fetch the file from the default master branch
+    #social = user.social_auth.get(provider='github')
+    # token = social.extra_data['access_token']
     headers = {
                 'content-type': 'application/json',
-                'Authorization': 'token ' + site.deploy_key
+                'Authorization': 'token ' + os.environ['GITHUB_OAUTH'] 
               }
     config_metadata = make_rest_get_call(url, headers)
 
@@ -91,7 +91,7 @@ def create_repo_webhook(site):
     # TODO - Confirm that a header token is the best/most secure way to go
     headers = {
                 'content-type': 'application/json',
-                'Authorization': 'token ' + site.deploy_key
+                'Authorization': 'token ' + os.environ['GITHUB_OAUTH']
               }
     body = {
                 'name': 'web',
@@ -99,7 +99,8 @@ def create_repo_webhook(site):
                 'active': True,
                 'config': {
                                 'url': base_url + 'deployed/',
-                                'content_type': 'json'
+                                'content_type': 'json',
+                                'secret': os.environ['GITHUB_SECRET']
                           }
             }
     url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/hooks'
@@ -125,26 +126,22 @@ def register_repo(request):
         if serializer and serializer.is_valid():
             # TODO - Do this after we have the config instead?
             site = serializer.save()
-            config = get_franklin_config(site)
+            config = get_franklin_config(site, request.user)
             if config and not hasattr(config, 'status_code'):
-                # update DB with any relevant .franklin config itmes here.
-                response = create_repo_webhook(site)
-                if not status.is_success(response.status_code):
-                    return Response(status=response.status_code)
-                else:
-                    return Response(status=status.HTTP_201_CREATED)
+                # Optional. Update DB with any relevant .franklin config
+                pass
+            response = create_repo_webhook(site)
+            if not status.is_success(response.status_code):
+                return Response(status=response.status_code)
             else:
-                return Response(status=config.status_code)
+                return Response(status=status.HTTP_201_CREATED)
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
+@permission_classes((GithubOnly, ))
 def deploy_hook(request):
     if request.method == 'POST':
-        # Github webhooks contain special headers we can check for
         event_type = request.META.get("HTTP_X_GITHUB_EVENT")
-        # Possibly useful for validation/security 
-        # request.META.get("HTTP_X_GITHUB_DELIVERY")
-
         if event_type:
             if event_type in ['push', 'create']:
                 github_event = GithubWebhookSerializer(data=request.data)

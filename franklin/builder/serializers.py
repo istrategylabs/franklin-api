@@ -1,5 +1,3 @@
-import os
-
 from rest_framework import serializers
 
 from builder.models import Owner, Site
@@ -45,8 +43,7 @@ class SiteSerializer(serializers.ModelSerializer):
                 github_id=owner_id, defaults=owner_data)
             if owner:
                 site, s_created = Site.objects.update_or_create(
-                    github_id=repo_id, deploy_key=os.environ['GITHUB_OAUTH'], 
-                    owner=owner, defaults=validated_data)
+                    github_id=repo_id, owner=owner, defaults=validated_data)
                 if site:
                     return site
         return None

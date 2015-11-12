@@ -13,6 +13,8 @@ from django.utils.translation import ugettext as _
 
 from rest_framework import status
 
+from builder.helpers import generate_ssh_keys
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,13 +42,15 @@ class Site(models.Model):
     :param name: The name of the project on github
     :param github_id: Unique ID github has assigned the project
     :param deploy_key: Token used to access the project on github
+    :param deploy_key_secret: Secret portion of the deploy_key
     """
     DEFAULT_ENV = _('Production')
 
     owner = models.ForeignKey(Owner, related_name='sites')
     name = models.CharField(max_length=100)
     github_id = models.PositiveIntegerField(unique=True)
-    deploy_key = models.CharField(max_length=255, default='')
+    deploy_key = models.TextField(blank=True, null=True)
+    deploy_key_secret = models.TextField(blank=True, null=True)
 
     def get_deployable_event(self, github_event):
         git_hash = github_event.get_event_hash()
@@ -71,6 +75,8 @@ class Site(models.Model):
         return None
     
     def save(self, *args, **kwargs):
+        if not self.deploy_key:
+            self.deploy_key, self.deploy_key_secret = generate_ssh_keys()
         super(Site, self).save(*args, **kwargs)
         if not self.environments.exists():
             self.environments.create(name=self.DEFAULT_ENV)
@@ -207,7 +213,7 @@ class Environment(models.Model):
             url = os.environ['BUILDER_URL']
             headers = {'content-type': 'application/json'}
             body = {
-                        "deploy_key": self.site.deploy_key,
+                        "deploy_key": os.environ['GITHUB_OAUTH'],
                         "branch": self.current_deploy.branch if not is_tag_build else '',
                         "tag": self.current_deploy.tag if is_tag_build else '',
                         "git_hash": self.current_deploy.git_hash  if not is_tag_build else '',
