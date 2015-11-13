@@ -1,4 +1,5 @@
 import logging
+import os
 from django.conf import settings
 from django.dispatch import receiver
 from django.db import models
@@ -26,7 +27,7 @@ class UserDetails(models.Model):
         # TODO - Confirm that a header token is the best/most secure way to go
         headers = {
                     'content-type': 'application/json',
-                    'Authorization': 'token ' + social.extra_data['access_token']
+                    'Authorization': 'token ' + os.environ['GITHUB_OAUTH']
                   }
         repos = []
 

@@ -173,3 +173,8 @@ def deploy_hook(request):
         # Invalid methods are caught at a higher level
         pass
     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def get_user_repos(request):
+    if request.method == 'GET':
+        return Response(request.user.details.get_user_repos())
