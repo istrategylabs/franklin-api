@@ -60,7 +60,7 @@ Now with Github deploys!
 1. Create a personal application for testing github's api. [github settings](https://github.com/settings/applications)
 1. The callback URL should look something like `http://192.168.99.100:5000/complete/github`
 1. Make sure there is no trailing slash on the callback URL
-1. Set the `Client ID` and `Client Secret` in your config above
+1. Set the `SOCIAL_AUTH_GITHUB_KEY` and `SOCIAL_AUTH_GITHUB_SECRET` in your config above
 
 ### Configure an oAuth application for franklin
 1. create a superuser `docker-compose run web python manage.py createsuperuser`
@@ -82,9 +82,9 @@ Now with Github deploys!
 1. Body type must be `x-www-form-urlencoded`
 1. Key/Values in body:
 1. `grant_type` -> `convert_token`
-1. `client_id` -> <client-id-from-superuser-admin-step>
-1. `client_secret` -> <client-secret-from-superuser-admin-step>
-1. `token` -> <token-from-github-step>
+1. `client_id` -> `<client-id-from-superuser-admin-step>`
+1. `client_secret` -> `<client-secret-from-superuser-admin-step>`
+1. `token` -> `<token-from-github-step>`
 1. `backend` -> `github`
 1. If successful, you should have a payload like below. All regular api calls
    will require the `access_token` in the header to succeed. At this point you
