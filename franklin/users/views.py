@@ -1,3 +1,3 @@
-from .helpers import LoginRequiredMixin
+from core.helpers import LoginRequiredMixin
 
 # TODO - If we don't end up using the above mixin, delete it.

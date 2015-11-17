@@ -9,58 +9,16 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from builder.helpers import make_rest_get_call, make_rest_post_call, GithubOnly 
+from core.helpers import make_rest_get_call, make_rest_post_call, GithubOnly 
 from builder.models import Site
 from builder.serializers import SiteSerializer
 from .serializers import GithubWebhookSerializer
-
-client_id = os.environ['CLIENT_ID']
-client_secret = os.environ['CLIENT_SECRET']
 
 base_url = os.environ['API_BASE_URL']
 github_base = 'https://api.github.com/'
 
 logger = logging.getLogger(__name__)
 
-def auth(request):
-    context = {'client_id': client_id}
-    return render(request, 'github/auth.html', context)
-
-"""
-def callback(request):
-    #Handles oauth callback from github and creates a new user
-    #object with their Github username and newly obtained access_token
-    
-    session_code = request.GET['code']
-
-    payload = {
-        'client_id': client_id,
-        'client_secret': client_secret,
-        'code': session_code
-    }
-
-    headers = {'Accept': 'application/json'}
-
-    r = requests.post(
-        'https://github.com/login/oauth/access_token',
-        json=payload,
-        headers=headers
-    )
-
-    access_token = r.json()['access_token']
-
-    payload = {'access_token': access_token}
-    r = requests.get(github_base + 'user', params=payload)
-
-    # Create user object once authenticated
-    # TODO: Should probably check to see if user already exists
-    User.objects.create(
-        username=r.json()['login'],
-        github_token=access_token
-    )
-
-    return HttpResponse(status=200)
-"""
 
 def get_franklin_config(site, user):
     url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/contents/.franklin.yml'
@@ -108,6 +66,30 @@ def create_repo_webhook(site):
 
 @api_view(['POST'])
 def register_repo(request):
+    """
+    Setup a project to be deployed by franklin
+    ---
+
+    type:
+        201:
+            required: true
+            type: string
+
+    request_serializer: SiteSerializer
+    omit_serializer: false
+
+    parameters_strategy:
+        form: merge
+    parameters:
+        - name: owner
+          pytype: builder.serializers.OwnerSerializer
+          required: true
+    responseMessages:
+        - code: 400
+          message: Invalid json received or Bad Request from Github
+        - code: 422
+          message: Validation error from Github
+    """
     # TODO - Lock this endpoint down so it's only callable from the future
     # admin panel.
     if request.method == 'POST':
@@ -140,6 +122,34 @@ def register_repo(request):
 @api_view(['POST'])
 @permission_classes((GithubOnly, ))
 def deploy_hook(request):
+    """
+    Private endpoint that should only be called from Github
+    ---
+
+    type:
+        200:
+            type: string
+        201:
+            type: string
+        204:
+            type: string
+
+    request_serializer: GithubWebhookSerializer
+    omit_serializer: false
+
+    parameters_strategy:
+        form: merge
+    parameters:
+        - name: head_commit
+          pytype: github.serializers.HeadCommitSerializer
+          required: true
+        - name: repository
+          pytype: github.serializers.RepositorySerializer
+          required: true
+    responseMessages:
+        - code: 400
+          message: Invalid json received or something else wrong.
+    """
     if request.method == 'POST':
         event_type = request.META.get("HTTP_X_GITHUB_EVENT")
         if event_type:

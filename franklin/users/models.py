@@ -6,7 +6,7 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.utils.translation import ugettext as _
 
-from builder.helpers import make_rest_get_call 
+from core.helpers import make_rest_get_call 
 
 github_base = 'https://api.github.com/'
 logger = logging.getLogger(__name__)

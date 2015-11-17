@@ -13,7 +13,7 @@ from django.utils.translation import ugettext as _
 
 from rest_framework import status
 
-from builder.helpers import generate_ssh_keys
+from core.helpers import generate_ssh_keys
 
 logger = logging.getLogger(__name__)
 

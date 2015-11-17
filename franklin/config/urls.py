@@ -16,15 +16,9 @@ Including another URLconf
 from django.conf.urls import include, url
 from django.contrib import admin
 
-from .views import health
-
-from github.views import deploy_hook, get_user_repos, register_repo
-
 urlpatterns = [
+    url(r'^', include('core.urls')),
+    url(r'^docs/', include('rest_framework_swagger.urls')),
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^deployed/', deploy_hook, name='deploy'),
-    url(r'^register/$', register_repo, name='register'),
-    url(r'^userrepos/$', get_user_repos, name='userrepos'),
-    url(r'^health/$', health, name='health'),
     url(r'^auth/', include('rest_framework_social_oauth2.urls')),
 ]

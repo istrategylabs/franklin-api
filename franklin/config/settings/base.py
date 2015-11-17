@@ -47,8 +47,10 @@ INSTALLED_APPS = (
     'oauth2_provider',
     'social.apps.django_app.default',
     'rest_framework_social_oauth2',
+    'rest_framework_swagger',
 
     # Local apps
+    'core',
     'github',
     'users',
     'builder',
@@ -199,4 +201,9 @@ LOGGING = {
             'handlers': ['console', 'dev_logfile', 'prod_logfile'],
         },
     }
+}
+
+SWAGGER_SETTINGS = {
+    "exclude_namespaces": [],
+    "api_version": 'v0.3.0-alpha',
 }
