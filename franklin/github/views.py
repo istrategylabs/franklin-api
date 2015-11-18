@@ -23,11 +23,11 @@ logger = logging.getLogger(__name__)
 def get_franklin_config(site, user):
     url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/contents/.franklin.yml'
     #TODO - This will fetch the file from the default master branch
-    #social = user.social_auth.get(provider='github')
-    # token = social.extra_data['access_token']
+    social = user.social_auth.get(provider='github')
+    token = social.extra_data['access_token']
     headers = {
                 'content-type': 'application/json',
-                'Authorization': 'token ' + os.environ['GITHUB_OAUTH'] 
+                'Authorization': 'token ' + token 
               }
     config_metadata = make_rest_get_call(url, headers)
 
@@ -45,11 +45,13 @@ def get_franklin_config(site, user):
 
 def create_repo_webhook(site):
     # TODO - check for existing webhook and update if needed (or skip)
+    social = user.social_auth.get(provider='github')
+    token = social.extra_data['access_token']
     
     # TODO - Confirm that a header token is the best/most secure way to go
     headers = {
                 'content-type': 'application/json',
-                'Authorization': 'token ' + os.environ['GITHUB_OAUTH']
+                'Authorization': 'token ' + token
               }
     body = {
                 'name': 'web',

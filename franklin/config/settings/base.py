@@ -98,6 +98,19 @@ AUTHENTICATION_BACKENDS = (
 
 SOCIAL_AUTH_GITHUB_SCOPE = ['user', 'repo']
 
+SOCIAL_AUTH_PIPELINE = (
+    'social.pipeline.social_auth.social_details',
+    'social.pipeline.social_auth.social_uid',
+    'social.pipeline.social_auth.auth_allowed',
+    'social.pipeline.social_auth.social_user',
+    'social.pipeline.user.get_username',
+    'social.pipeline.user.create_user',
+    'social.pipeline.social_auth.associate_user',
+    'core.views.save_oauth',
+    'social.pipeline.social_auth.load_extra_data',
+    'social.pipeline.user.user_details',
+)
+
 WSGI_APPLICATION = 'config.wsgi.application'
 
 

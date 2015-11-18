@@ -22,12 +22,13 @@ class UserDetails(models.Model):
 
     def get_user_repos(self):
         social = self.user.social_auth.get(provider='github')
+        token = social.extra_data['access_token']
         have_next_page = True
         url = github_base + 'user/repos?per_page=100'
         # TODO - Confirm that a header token is the best/most secure way to go
         headers = {
                     'content-type': 'application/json',
-                    'Authorization': 'token ' + os.environ['GITHUB_OAUTH']
+                    'Authorization': 'token ' + token
                   }
         repos = []
 
