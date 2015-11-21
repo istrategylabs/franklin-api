@@ -6,6 +6,7 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.utils.translation import ugettext as _
 
+from builder.models import Site
 from core.helpers import make_rest_get_call 
 
 github_base = 'https://api.github.com/'
@@ -19,6 +20,7 @@ class UserDetails(models.Model):
     :param user: FK to a unique user
     """
     user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='details')
+    sites = models.ManyToManyField(Site, related_name='admins')
 
     def get_user_repos(self):
         social = self.user.social_auth.get(provider='github')
@@ -47,6 +49,8 @@ class UserDetails(models.Model):
                     repo_data['owner'] = {}
                     repo_data['owner']['name'] = repo['owner']['login']
                     repo_data['owner']['id'] = repo['owner']['id']
+                    repo_data['permissions'] = {}
+                    repo_data['permissions']['admin'] = repo['permissions']['admin']
                     repos.append(repo_data)
 
                 # If the header has a paging link called 'next', update our url
@@ -58,6 +62,24 @@ class UserDetails(models.Model):
         if not repos:
             logger.error('Failed to find repos for user', user.username)
         return repos
+
+    def update_repos_for_user(self):
+        repos = self.get_user_repos()
+        # Clear out the users sites in case permissions have changed
+        self.sites.clear()
+        all_sites = Site.objects.all()
+        for repo in repos:
+            site = all_sites.filter(github_id=repo['id']).first()
+            if site and repo['permissions']['admin'] == True:
+                self.sites.add(site)
+        return self.sites.all()
+
+    def has_repo_access(self, site):
+        if self.sites.count() == 0 or site not in self.sites.all():
+            self.update_repos_for_user()
+        if site in self.sites.all():
+            return True
+        return False
 
     def __str__(self):
         return self.user.username

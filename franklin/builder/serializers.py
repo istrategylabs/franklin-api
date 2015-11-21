@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from builder.models import Owner, Site
+from builder.models import Environment, Owner, Site
 
 
 class OwnerSerializer(serializers.ModelSerializer):
@@ -14,13 +14,26 @@ class OwnerSerializer(serializers.ModelSerializer):
             },
         }
 
+        
+class EnvironmentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Environment
+        fields = ('name', 'url', 'status')
+        extra_kwargs = {
+            "github_id": {
+                "validators": [],
+            },
+        }
+
 
 class SiteSerializer(serializers.ModelSerializer):
     owner = OwnerSerializer()
+    environments = EnvironmentSerializer(many=True, required=False)
 
     class Meta:
         model = Site
-        fields = ('name', 'github_id', 'owner')
+        fields = ('name', 'github_id', 'owner', 'environments')
         # Not ideal, but you can't update existing models without disabling
         # validation for our unique=True github_id
         # This is a known issue in DRF:

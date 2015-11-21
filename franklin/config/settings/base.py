@@ -106,8 +106,8 @@ SOCIAL_AUTH_PIPELINE = (
     'social.pipeline.user.get_username',
     'social.pipeline.user.create_user',
     'social.pipeline.social_auth.associate_user',
-    'core.views.save_oauth',
     'social.pipeline.social_auth.load_extra_data',
+    'core.views.save_oauth',
     'social.pipeline.user.user_details',
 )
 

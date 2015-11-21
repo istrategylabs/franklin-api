@@ -43,7 +43,7 @@ def get_franklin_config(site, user):
             return config_payload
     return config_metadata
 
-def create_repo_webhook(site):
+def create_repo_webhook(site, user):
     # TODO - check for existing webhook and update if needed (or skip)
     social = user.social_auth.get(provider='github')
     token = social.extra_data['access_token']
@@ -89,11 +89,11 @@ def register_repo(request):
     responseMessages:
         - code: 400
           message: Invalid json received or Bad Request from Github
+        - code: 403
+          message: Current user does not have deployment permissions
         - code: 422
           message: Validation error from Github
     """
-    # TODO - Lock this endpoint down so it's only callable from the future
-    # admin panel.
     if request.method == 'POST':
         """
         # Calling github will look something like this
@@ -110,16 +110,30 @@ def register_repo(request):
         if serializer and serializer.is_valid():
             # TODO - Do this after we have the config instead?
             site = serializer.save()
-            config = get_franklin_config(site, request.user)
-            if config and not hasattr(config, 'status_code'):
-                # Optional. Update DB with any relevant .franklin config
-                pass
-            response = create_repo_webhook(site)
-            if not status.is_success(response.status_code):
-                return Response(status=response.status_code)
+            if request.user.details.has_repo_access(site):
+                config = get_franklin_config(site, request.user)
+                if config and not hasattr(config, 'status_code'):
+                    # Optional. Update DB with any relevant .franklin config
+                    pass
+                response = create_repo_webhook(site, request.user)
+                if not status.is_success(response.status_code):
+                    return Response(status=response.status_code)
+                else:
+                    return Response(status=status.HTTP_201_CREATED)
             else:
-                return Response(status=status.HTTP_201_CREATED)
+                message = 'Current user does not have deployment permissions'
+                logger.warn(message + ' | %s | %s', request.user, site)
+                return Response(message, status=status.HTTP_403_FORBIDDEN)
     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def get_user_repos(request):
+    if request.method == 'GET':
+        if request.user.details.sites.count() == 0:
+            request.user.details.update_repos_for_user()
+        site_data = request.user.details.sites.all()
+        serializer = SiteSerializer(site_data, many=True)
+        return Response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes((GithubOnly, ))
@@ -185,8 +199,3 @@ def deploy_hook(request):
         # Invalid methods are caught at a higher level
         pass
     return Response(status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET'])
-def get_user_repos(request):
-    if request.method == 'GET':
-        return Response(request.user.details.get_user_repos())
