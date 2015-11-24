@@ -8,6 +8,7 @@ Now with Github deploys!
 
 1. Install [docker toolbox](https://www.docker.com/toolbox)
 1. Initialize your docker machine system if you have not already: `docker-machine start default`
+1. Create a .env file at the root of the project. (See below for .env contents)
 1. Run our startup script: `. ./scripts/setup.sh`
 1. In a new shell run `docker-machine ip default` to find out the IP address of your container
 1. Visit site at `<my-ip>:5000`
@@ -19,18 +20,16 @@ Now with Github deploys!
 
 
     ```
-      CLIENT_ID=<github_client_id>
-      CLIENT_SECRET=<github_client_secret>
-      BASE_PROJECT_PATH=~/Desktop
+      BASE_PROJECT_PATH=~/Desktop                  (root folder where build will save built assets to)
       DJANGO_SETTINGS_MODULE=config.settings.local
       BASE_URL=franklinstatic.com
-      SECRET_KEY=<your_secret_key>
-      BUILDER_URL=<franklin_builder_url>
+      SECRET_KEY=<your_secret_key>                 (random key used by django)
+      BUILDER_URL=<franklin_builder_url>           (where api can call the running builder)
       ENV='local'
-      API_BASE_URL=<franklin_api_url>
+      API_BASE_URL=<franklin_api_url>              (used for services like github to call. usually an ngrok url for testing)
       SOCIAL_AUTH_GITHUB_KEY=<github_client_id>
       SOCIAL_AUTH_GITHUB_SECRET=<github_client_secret>
-      GITHUB_SECRET=<for_validating_github_webhook_messages>
+      GITHUB_SECRET=<for_validating_github_webhook_messages>    (random key used to secure communication with github)
     ```
 - Projects you wish to be deployed by franklin will need a `.franklin` file in their root
 
