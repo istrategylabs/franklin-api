@@ -5,10 +5,8 @@ import re
 import requests
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 import sys
-import uuid
 
 from django.db import models
-from django.utils import timezone
 from django.utils.translation import ugettext as _
 
 from rest_framework import status
@@ -29,7 +27,7 @@ class Owner(models.Model):
 
     def __str__(self):
         return self.name
-    
+
     class Meta(object):
         verbose_name = _('Owner')
         verbose_name_plural = _('Owners')
@@ -63,17 +61,17 @@ class Site(models.Model):
                     and event.endswith(env.branch)):
                 build, created = BranchBuild.objects.get_or_create(
                     git_hash=git_hash, branch=env.branch, site=self)
-            elif (env.deploy_type == Environment.TAG and is_tag_event 
+            elif (env.deploy_type == Environment.TAG and is_tag_event
                     and re.match(env.tag_regex, event)):
                 build, created = TagBuild.objects.get_or_create(
                     tag=event, site=self)
-                
+
             if build:
                 env.current_deploy = build
                 env.save()
                 return env
         return None
-    
+
     def save(self, *args, **kwargs):
         if not self.deploy_key:
             self.deploy_key, self.deploy_key_secret = generate_ssh_keys()
@@ -83,7 +81,7 @@ class Site(models.Model):
 
     def __str__(self):
         return self.name
-    
+
     class Meta(object):
         verbose_name = _('Site')
         verbose_name_plural = _('Sites')
@@ -110,7 +108,7 @@ class Build(models.Model):
 
 class TagBuild(Build):
     """ Flavor of build that was created from a tag
-    
+
     :param tag: If a tag build, the name of the tag
     """
     tag = models.CharField(max_length=100, unique=True)
@@ -118,12 +116,12 @@ class TagBuild(Build):
     def save(self, *args, **kwargs):
         clean_tag = re.sub('[^a-zA-Z0-9]', '', self.tag)
         self.path = self.get_path(
-                self.site.owner.name, self.site.name, clean_tag)
+            self.site.owner.name, self.site.name, clean_tag)
         super(TagBuild, self).save(*args, **kwargs)
 
     def __str__(self):
         return '%s %s' % (self.site.name, self.tag)
-    
+
     class Meta(object):
         verbose_name = _('Tag Build')
         verbose_name_plural = _('Tag Builds')
@@ -131,7 +129,7 @@ class TagBuild(Build):
 
 class BranchBuild(Build):
     """ Flavor of build that was created from a branch
-    
+
     :param branch: If a branch build, the name of the branch
     :param git_hash: If a branch build, the git hash of the deployed code
     """
@@ -140,12 +138,12 @@ class BranchBuild(Build):
 
     def save(self, *args, **kwargs):
         self.path = self.get_path(
-                self.site.owner.name, self.site.name, self.git_hash)
+            self.site.owner.name, self.site.name, self.git_hash)
         super(BranchBuild, self).save(*args, **kwargs)
 
     def __str__(self):
         return '%s %s' % (self.site.name, self.git_hash)
-    
+
     class Meta(object):
         verbose_name = _('Branch Build')
         verbose_name_plural = _('Branch Builds')
@@ -168,7 +166,7 @@ class Environment(models.Model):
     :param past_builds: Ref to all builds that can be marked current_deployed
     :param status: The current status of the deployed version on Franklin
     """
-    
+
     BRANCH = 'BCH'
     TAG = 'TAG'
     PROMOTE = 'PRO'
@@ -178,7 +176,7 @@ class Environment(models.Model):
         (TAG, _('Any commit matching a tag regex')),
         (PROMOTE, _('Manually from a lower environment'))
     )
-    
+
     REGISTERED = 'REG'
     BUILDING = 'BLD'
     SUCCESS = 'SUC'
@@ -190,7 +188,7 @@ class Environment(models.Model):
         (SUCCESS, _('Deploy Succeeded')),
         (FAILED, _('Deploy Failed'))
     )
-    
+
     site = models.ForeignKey(Site, related_name='environments')
     name = models.CharField(max_length=100, default='')
     description = models.TextField(max_length=20480, default='', blank=True)
@@ -206,21 +204,22 @@ class Environment(models.Model):
         Build, related_name='environments', blank=True)
     status = models.CharField(
         max_length=3, choices=STATUS_CHOICES, default=REGISTERED)
-    
+
     def build(self):
         if self.current_deploy:
             is_tag_build = hasattr(self.current_deploy, 'tagbuild')
             url = os.environ['BUILDER_URL']
             headers = {'content-type': 'application/json'}
             body = {
-                        "deploy_key": os.environ['GITHUB_OAUTH'],
-                        "branch": self.current_deploy.branch if not is_tag_build else '',
-                        "tag": self.current_deploy.tag if is_tag_build else '',
-                        "git_hash": self.current_deploy.git_hash  if not is_tag_build else '',
-                        "repo_owner": self.site.owner.name,
-                        "path": self.current_deploy.path,
-                        "repo_name": self.site.name
-                    }
+                "deploy_key": os.environ['GITHUB_OAUTH'],
+                "branch": self.current_deploy.branch if not is_tag_build else '',
+                "tag": self.current_deploy.tag if is_tag_build else '',
+                "git_hash": self.current_deploy.git_hash if not is_tag_build else '',
+                "repo_owner": self.site.owner.name,
+                "path": self.current_deploy.path,
+                "repo_name": self.site.name,
+                "environment_id": self.id
+                }
             r = None
             try:
                 r = requests.post(url, data=json.dumps(body), headers=headers)
@@ -230,7 +229,7 @@ class Environment(models.Model):
                 logger.error('Unexpected Builder error: %s', sys.exc_info()[0])
 
             if r is not None:
-                if (status.is_success(r.status_code) and 
+                if (status.is_success(r.status_code) and
                         r.headers['Content-Type'] == 'application/json'):
                     building_status = r.json()['building']
                     if building_status:
@@ -249,16 +248,16 @@ class Environment(models.Model):
     def save(self, *args, **kwargs):
         if self.current_deploy:
             if self.name == self.site.DEFAULT_ENV:
-                self.url = "{0}.{1}".format(self.site.name, 
+                self.url = "{0}.{1}".format(self.site.name,
                                             os.environ['BASE_URL'])
             else:
-                self.url = "{0}-{1}.{2}".format(self.site.name, 
-                                                self.name, 
+                self.url = "{0}-{1}.{2}".format(self.site.name,
+                                                self.name,
                                                 os.environ['BASE_URL'])
             if not self.past_builds.filter(pk=self.current_deploy.pk).exists():
                 self.past_builds.add(self.current_deploy)
         super(Environment, self).save(*args, **kwargs)
-    
+
     def __str__(self):
         return '%s %s' % (self.site.name, self.name)
 

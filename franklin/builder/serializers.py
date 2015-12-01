@@ -14,7 +14,7 @@ class OwnerSerializer(serializers.ModelSerializer):
             },
         }
 
-        
+
 class EnvironmentSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -25,6 +25,13 @@ class EnvironmentSerializer(serializers.ModelSerializer):
                 "validators": [],
             },
         }
+
+
+class EnvironmentStatusSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Environment
+        fields = ('status',)
 
 
 class SiteSerializer(serializers.ModelSerializer):
