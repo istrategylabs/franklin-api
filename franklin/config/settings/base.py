@@ -48,6 +48,7 @@ INSTALLED_APPS = (
     'social.apps.django_app.default',
     'rest_framework_social_oauth2',
     'rest_framework_swagger',
+    'corsheaders',
 
     # Local apps
     'core',
@@ -65,6 +66,13 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+)
+
+CORS_ORIGIN_ALLOW_ALL = False
+CORS_ALLOW_CREDENTIALS = True
+CORS_ORIGIN_WHITELIST = (
+    'http://localhost:3000'
 )
 
 ROOT_URLCONF = 'config.urls'
@@ -147,7 +155,8 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'oauth2_provider.ext.rest_framework.OAuth2Authentication',
         'rest_framework_social_oauth2.authentication.SocialAuthentication',
-    )
+    ),
+    'DEFAULT_METADATA_CLASS': 'rest_framework.metadata.SimpleMetadata'
 }
 
 # Logging

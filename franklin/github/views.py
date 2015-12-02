@@ -1,12 +1,14 @@
 import logging
 import os
 import yaml
+import requests
 
 from django.shortcuts import render
 from django.http import HttpResponse
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from core.helpers import make_rest_get_call, make_rest_post_call, GithubOnly 
@@ -14,6 +16,8 @@ from builder.models import Site
 from builder.serializers import SiteSerializer
 from .serializers import GithubWebhookSerializer
 
+
+github_secret = os.environ['SOCIAL_AUTH_GITHUB_SECRET']
 base_url = os.environ['API_BASE_URL']
 github_base = 'https://api.github.com/'
 
@@ -199,3 +203,71 @@ def deploy_hook(request):
         # Invalid methods are caught at a higher level
         pass
     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def get_user_repos(request):
+    if request.method == 'GET':
+        return Response(request.user.details.get_user_repos())
+
+def get_access_token(request):
+    """
+    Tries to get the access token from an OAuth Provider
+    :param request:
+    :param backend:
+    :return:
+    """
+    url = 'https://github.com/login/oauth/access_token'
+    secret = github_secret
+
+    headers = {
+        'content-type': 'application/json',
+        'accept': 'application/json'
+    }
+    params = {
+        "code": request.data.get('code'),
+        "client_id": request.data.get('clientId'), 
+        "redirect_uri": request.data.get('redirectUri'),
+        "client_secret": secret
+    }
+
+    # Exchange authorization code for access token.
+    r = make_rest_post_call(url, headers, params)
+    if status.is_success(r.status_code):
+        try:
+            access_token = r.json().get('access_token', None) 
+            response_data = Response({
+                'token': access_token 
+            }, status=status.HTTP_200_OK)
+        except KeyError:
+            response_data = Response({'status': 'Bad request',
+                         'message': 'Authentication could not be performed with received data.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+        return response_data
+    else:
+        return Response(status=r.status_code)
+
+
+@api_view(['POST'])
+@permission_classes((AllowAny, ))
+def get_auth_token(request):
+    """
+    View to authenticate with github using a client code
+    ---
+
+    parameters:
+        -   name: clientId
+            pytype: String
+            required: true
+        -   name: redirectUri
+            pytype: String
+            required: true
+        -   name: code
+            pytype: String
+            required: true
+    responseMessages:
+        - token: token value or 'FAILED'
+    """
+
+    logger.info("Received token request from Dashboard")
+
+    return get_access_token(request)
