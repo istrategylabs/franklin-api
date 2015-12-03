@@ -63,8 +63,7 @@ class UserDetails(models.Model):
             logger.error('Failed to find repos for user', user.username)
         return repos
 
-    def update_repos_for_user(self):
-        repos = self.get_user_repos()
+    def update_repos_for_user(self, repos):
         # Clear out the users sites in case permissions have changed
         self.sites.clear()
         all_sites = Site.objects.all()
@@ -76,7 +75,8 @@ class UserDetails(models.Model):
 
     def has_repo_access(self, site):
         if self.sites.count() == 0 or site not in self.sites.all():
-            self.update_repos_for_user()
+            repos = self.get_user_repos()
+            self.update_repos_for_user(repos)
         if site in self.sites.all():
             return True
         return False

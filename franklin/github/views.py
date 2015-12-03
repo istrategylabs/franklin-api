@@ -47,6 +47,7 @@ def get_franklin_config(site, user):
             return config_payload
     return config_metadata
 
+
 def create_repo_webhook(site, user):
     # TODO - check for existing webhook and update if needed (or skip)
     social = user.social_auth.get(provider='github')
@@ -69,6 +70,7 @@ def create_repo_webhook(site, user):
             }
     url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/hooks'
     return make_rest_post_call(url, headers, body)
+
 
 @api_view(['POST'])
 def register_repo(request):
@@ -130,14 +132,50 @@ def register_repo(request):
                 return Response(message, status=status.HTTP_403_FORBIDDEN)
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['GET'])
-def get_user_repos(request):
+def deployed_repos(request):
+    """
+    All repos currently deployed by Franklin that the user can manage.
+    ---
+
+    response_serializer: SiteSerializer
+
+    responseMessages:
+        - code: 500
+          message: Error from Github.
+    """
     if request.method == 'GET':
         if request.user.details.sites.count() == 0:
-            request.user.details.update_repos_for_user()
+            github_repos = request.user.details.get_user_repos()
+            # TODO - return error from github
+            request.user.details.update_repos_for_user(github_repos)
         site_data = request.user.details.sites.all()
         serializer = SiteSerializer(site_data, many=True)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def deployable_repos(request):
+    """
+    All repos from Github that the user has the permission level to deploy
+    ---
+
+    responseMessages:
+        - code: 500
+          message: Error from Github.
+    """
+    if request.method == 'GET':
+        # TODO - in the model, github response should map to a serializer which
+        # we should use here to define the respone type
+        github_repos = request.user.details.get_user_repos()
+        # TODO - return error from github
+
+        # While we are here, might as well update linkages between the user and
+        # all active repos managed by Franklin
+        request.user.details.update_repos_for_user(github_repos)
+        return Response(github_repos, status=status.HTTP_200_OK)
+
 
 @api_view(['POST'])
 @permission_classes((GithubOnly, ))
@@ -204,10 +242,6 @@ def deploy_hook(request):
         pass
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET'])
-def get_user_repos(request):
-    if request.method == 'GET':
-        return Response(request.user.details.get_user_repos())
 
 def get_access_token(request):
     """
@@ -254,18 +288,21 @@ def get_auth_token(request):
     View to authenticate with github using a client code
     ---
 
+    type:
+        token:
+            type: string
+            required: true
+            description: oAuth token for the github user
     parameters:
         -   name: clientId
-            pytype: String
+            type: string
             required: true
         -   name: redirectUri
-            pytype: String
+            type: string
             required: true
         -   name: code
-            pytype: String
+            type: string
             required: true
-    responseMessages:
-        - token: token value or 'FAILED'
     """
 
     logger.info("Received token request from Dashboard")
