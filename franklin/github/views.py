@@ -253,19 +253,6 @@ def get_auth_token(request):
     """
     View to authenticate with github using a client code
     ---
-
-    parameters:
-        -   name: clientId
-            pytype: String
-            required: true
-        -   name: redirectUri
-            pytype: String
-            required: true
-        -   name: code
-            pytype: String
-            required: true
-    responseMessages:
-        - token: token value or 'FAILED'
     """
 
     logger.info("Received token request from Dashboard")
