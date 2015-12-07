@@ -1,17 +1,13 @@
-import json
 import logging
 import os
 import re
-import requests
-from requests.exceptions import ConnectionError, HTTPError, Timeout
-import sys
 
 from django.db import models
 from django.utils.translation import ugettext as _
 
 from rest_framework import status
 
-from core.helpers import generate_ssh_keys
+from core.helpers import generate_ssh_keys, make_rest_post_call
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +53,12 @@ class Site(models.Model):
 
         build = None
         for env in self.environments.all():
-            if (env.deploy_type == Environment.BRANCH and not is_tag_event
-                    and event.endswith(env.branch)):
+            if (env.deploy_type == Environment.BRANCH and not
+                    is_tag_event and event.endswith(env.branch)):
                 build, created = BranchBuild.objects.get_or_create(
                     git_hash=git_hash, branch=env.branch, site=self)
-            elif (env.deploy_type == Environment.TAG and is_tag_event
-                    and re.match(env.tag_regex, event)):
+            elif (env.deploy_type == Environment.TAG and
+                    is_tag_event and re.match(env.tag_regex, event)):
                 build, created = TagBuild.objects.get_or_create(
                     tag=event, site=self)
 
@@ -208,41 +204,30 @@ class Environment(models.Model):
     def build(self):
         if self.current_deploy:
             is_tag_build = hasattr(self.current_deploy, 'tagbuild')
-            url = os.environ['BUILDER_URL']
+            branch = self.current_deploy.branch if not is_tag_build else ''
+            tag = self.current_deploy.tag if is_tag_build else ''
+            git_hash = self.current_deploy.git_hash if not is_tag_build else ''
+
+            url = os.environ['BUILDER_URL'] + '/build'
             headers = {'content-type': 'application/json'}
             body = {
                 "deploy_key": os.environ['GITHUB_OAUTH'],
-                "branch": self.current_deploy.branch if not is_tag_build else '',
-                "tag": self.current_deploy.tag if is_tag_build else '',
-                "git_hash": self.current_deploy.git_hash if not is_tag_build else '',
+                "branch": branch,
+                "tag": tag,
+                "git_hash": git_hash,
                 "repo_owner": self.site.owner.name,
                 "path": self.current_deploy.path,
                 "repo_name": self.site.name,
                 "environment_id": self.id
                 }
-            r = None
-            try:
-                r = requests.post(url, data=json.dumps(body), headers=headers)
-            except (ConnectionError, HTTPError, Timeout) as e:
-                logger.error('Connection exception : %s', e)
-            except:
-                logger.error('Unexpected Builder error: %s', sys.exc_info()[0])
 
-            if r is not None:
-                if (status.is_success(r.status_code) and
-                        r.headers['Content-Type'] == 'application/json'):
-                    building_status = r.json()['building']
-                    if building_status:
-                        self.status = self.BUILDING
-                        self.save()
-                        return
-                    else:
-                        logger.error("Negative response from Builder")
-                else:
-                    logger.error('Builder responded without json')
+            response = make_rest_post_call(url, headers, body)
+            if not status.is_success(response.status_code):
+                logger.error("Negative response from Builder: %s",
+                             response.status_code)
+                self.status = self.FAILED
             else:
-                logger.error('Bad response from builder.')
-            self.status = self.FAILED
+                self.status = self.BUILDING
             self.save()
 
     def save(self, *args, **kwargs):

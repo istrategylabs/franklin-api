@@ -1,9 +1,9 @@
 import logging
 
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 from rest_framework_social_oauth2 import views as social_oauth_views
 from social.pipeline.partial import partial
@@ -16,7 +16,7 @@ class ConvertTokenView(social_oauth_views.ConvertTokenView, APIView):
     permission_classes = (AllowAny,)
 
     def post(self, request, *args, **kwargs):
-        """ 
+        """
         Exchange social token for franklin oAuth access token
         ---
         type:
@@ -63,7 +63,7 @@ class ConvertTokenView(social_oauth_views.ConvertTokenView, APIView):
             - name: token
               type: string
               required: true
-              description: Github oAuth token obtained from user social signin 
+              description: Github oAuth token obtained from user social signin
         """
         return super(ConvertTokenView, self).post(request, *args, **kwargs)
 
@@ -71,7 +71,17 @@ class ConvertTokenView(social_oauth_views.ConvertTokenView, APIView):
 @api_view(('GET',))
 @permission_classes((AllowAny, ))
 def health(request):
-    return Response('Healthy!')
+    """
+    For testing if the API is behaving properly
+    ---
+    type:
+        200:
+            type: string
+            description: All is well
+            required: true
+    """
+    return Response(status=status.HTTP_200_OK)
+
 
 @partial
 def save_oauth(strategy, details, user=False, *args, **kwargs):
@@ -83,7 +93,5 @@ def save_oauth(strategy, details, user=False, *args, **kwargs):
         social = user.social_auth.get(provider='github')
         social.extra_data['access_token'] = access_token
         social.save()
-        return { 'is_new': False, 'user': user }
-    return { 'is_new': True, 'user': None }
-
-        
+        return {'is_new': False, 'user': user}
+    return {'is_new': True, 'user': None}

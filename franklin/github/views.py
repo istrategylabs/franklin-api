@@ -1,18 +1,13 @@
 import logging
 import os
 import yaml
-import requests
-
-from django.shortcuts import render
-from django.http import HttpResponse
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.helpers import make_rest_get_call, make_rest_post_call, GithubOnly 
-from builder.models import Site
+from core.helpers import make_rest_get_call, make_rest_post_call, GithubOnly
 from builder.serializers import SiteSerializer
 from .serializers import GithubWebhookSerializer
 
@@ -25,13 +20,14 @@ logger = logging.getLogger(__name__)
 
 
 def get_franklin_config(site, user):
-    url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/contents/.franklin.yml'
-    #TODO - This will fetch the file from the default master branch
+    url = github_base + 'repos/' + site.owner.name + '/'\
+            + site.name + '/contents/.franklin.yml'
+    # TODO - This will fetch the file from the default master branch
     social = user.social_auth.get(provider='github')
     token = social.extra_data['access_token']
     headers = {
                 'content-type': 'application/json',
-                'Authorization': 'token ' + token 
+                'Authorization': 'token ' + token
               }
     config_metadata = make_rest_get_call(url, headers)
 
@@ -52,7 +48,7 @@ def create_repo_webhook(site, user):
     # TODO - check for existing webhook and update if needed (or skip)
     social = user.social_auth.get(provider='github')
     token = social.extra_data['access_token']
-    
+
     # TODO - Confirm that a header token is the best/most secure way to go
     headers = {
                 'content-type': 'application/json',
@@ -101,17 +97,6 @@ def register_repo(request):
           message: Validation error from Github
     """
     if request.method == 'POST':
-        """
-        # Calling github will look something like this
-        user = User.objects.get(...)
-        social = user.social_auth.get(provider='google-oauth2')
-        response = requests.get(
-                    'https://www.googleapis.com/plus/v1/people/me/people/visible',
-                        params={'access_token':
-                            social.extra_data['access_token']}
-                        )
-        friends = response.json()['items']
-        """
         serializer = SiteSerializer(data=request.data)
         if serializer and serializer.is_valid():
             # TODO - Do this after we have the config instead?
@@ -218,7 +203,8 @@ def deploy_hook(request):
                     if site:
                         environment = site.get_deployable_event(github_event)
                         if environment:
-                            # This line helps with testing. We will remove once we add mocking.
+                            # This line helps with testing.
+                            # We will remove once we add mocking.
                             if os.environ['ENV'] is not 'test':
                                 environment.build()
                                 return Response(status=status.HTTP_201_CREATED)
@@ -226,12 +212,12 @@ def deploy_hook(request):
                             # Likely a webhook we don't build for.
                             return Response(status=status.HTTP_200_OK)
                 else:
-                    logger.warning("Received an invalid Github Webhook message")
+                    logger.warning("Received invalid Github Webhook message")
             elif event_type == 'ping':
                 # TODO - update the DB with some important info here
-                # repository{ 
-                #           id, name, 
-                #           owner{ id, login }, 
+                # repository{
+                #           id, name,
+                #           owner{ id, login },
                 #           sender{ id, login, site_admin }
                 #           }
                 return Response(status=status.HTTP_204_NO_CONTENT)
@@ -259,7 +245,7 @@ def get_access_token(request):
     }
     params = {
         "code": request.data.get('code'),
-        "client_id": request.data.get('clientId'), 
+        "client_id": request.data.get('clientId'),
         "redirect_uri": request.data.get('redirectUri'),
         "client_secret": secret
     }
@@ -268,14 +254,15 @@ def get_access_token(request):
     r = make_rest_post_call(url, headers, params)
     if status.is_success(r.status_code):
         try:
-            access_token = r.json().get('access_token', None) 
+            access_token = r.json().get('access_token', None)
             response_data = Response({
-                'token': access_token 
+                'token': access_token
             }, status=status.HTTP_200_OK)
         except KeyError:
             response_data = Response({'status': 'Bad request',
-                         'message': 'Authentication could not be performed with received data.'},
-                        status=status.HTTP_400_BAD_REQUEST)
+                                      'message': 'Authentication could not be\
+                                              performed with received data.'},
+                                     status=status.HTTP_400_BAD_REQUEST)
         return response_data
     else:
         return Response(status=r.status_code)
