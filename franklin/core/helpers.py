@@ -5,9 +5,17 @@ import logging
 import os
 import requests
 import sys
-from requests.exceptions import ConnectionError, HTTPError, Timeout
 
+from django.core.urlresolvers import reverse
+
+from requests.exceptions import ConnectionError, HTTPError, Timeout
+from rest_framework import exceptions, HTTP_HEADER_ENCODING
 from rest_framework import status, permissions
+from rest_framework.authentication import BaseAuthentication,\
+                                          get_authorization_header
+from social.apps.django_app.default.models import UserSocialAuth
+from social.apps.django_app.views import NAMESPACE
+from social.apps.django_app.utils import load_backend, load_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -68,3 +76,41 @@ class GithubOnly(permissions.BasePermission):
             is_valid_github = hmac.compare_digest(computed_secret, secret)
             return is_valid_github
         return False
+
+
+class SocialAuthentication(BaseAuthentication):
+    """
+    Used in DEFAULT_AUTHENTICATION_CLASSES settings for authentication.
+    This setting allows users to authenticate with only a Github oauth token.
+    """
+    def authenticate(self, request):
+        auth_header = get_authorization_header(request)\
+                            .decode(HTTP_HEADER_ENCODING)
+        auth = auth_header.split()
+        if not auth or auth[0].lower() != 'bearer':
+            return None
+        if len(auth) == 1:
+            msg = 'Credentials are malformed'
+            raise exceptions.AuthenticationFailed(msg)
+        oauth_token = auth[1]
+
+        social_user = UserSocialAuth.objects\
+                                    .filter(extra_data__contains=oauth_token)\
+                                    .first()
+        if not social_user:
+            # User does not exist in our DB, attempt social auth
+            strategy = load_strategy(request=request)
+            path = NAMESPACE + ":complete"
+            backend = 'github'
+            backend = load_backend(strategy, backend,
+                                   reverse(path, args=(backend,)))
+            user = backend.do_auth(access_token=oauth_token)
+            if not user:
+                msg = 'Bad credentials'
+                raise exceptions.AuthenticationFailed(msg)
+            social = user.social_auth.get(provider='github')
+            social.extra_data['access_token'] = oauth_token
+            social.save()
+        else:
+            user = social_user.user
+        return user, oauth_token

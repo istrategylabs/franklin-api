@@ -44,9 +44,7 @@ INSTALLED_APPS = (
 
     # third part apps
     'rest_framework',
-    'oauth2_provider',
     'social.apps.django_app.default',
-    'rest_framework_social_oauth2',
     'rest_framework_swagger',
     'corsheaders',
 
@@ -96,11 +94,7 @@ TEMPLATES = [
 ]
 
 AUTHENTICATION_BACKENDS = (
-    # Github python-social-auth
     'social.backends.github.GithubOAuth2',
-    # django-rest-framework-social-oauth2
-    'rest_framework_social_oauth2.backends.DjangoOAuth2',
-    # django
     'django.contrib.auth.backends.ModelBackend'
 )
 
@@ -115,7 +109,6 @@ SOCIAL_AUTH_PIPELINE = (
     'social.pipeline.user.create_user',
     'social.pipeline.social_auth.associate_user',
     'social.pipeline.social_auth.load_extra_data',
-    'core.views.save_oauth',
     'social.pipeline.user.user_details',
 )
 
@@ -146,21 +139,20 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, '../../staticfiles')
 
-# REST API 
+# REST API
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'oauth2_provider.ext.rest_framework.OAuth2Authentication',
-        'rest_framework_social_oauth2.authentication.SocialAuthentication',
+        'core.helpers.SocialAuthentication',
     ),
     'DEFAULT_METADATA_CLASS': 'rest_framework.metadata.SimpleMetadata'
 }
 
 # Logging
-LOGFILE_SIZE = 5 * 1024 * 1024 #5MB
+LOGFILE_SIZE = 5 * 1024 * 1024 # 5MB
 LOGFILE_COUNT = 5
 
 LOGGING = {

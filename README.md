@@ -38,6 +38,10 @@ Now with Github deploys!
     Note - Environment configuration will likely be handled during the registration step. So not here.
   ```
 
+### Viewing models at /admin
+1. create a superuser `docker-compose run web python manage.py createsuperuser`
+1. Login as super user as `http://192.168.99.100:5000/admin/`
+
 ## Making Changes to the Code
 
 - If your code change includes a new requirement, you will likely have to run `docker-compose build`. This will re-run the build step which will include a pip install of all requirements.
@@ -61,15 +65,6 @@ Now with Github deploys!
 1. Make sure there is no trailing slash on the callback URL
 1. Set the `SOCIAL_AUTH_GITHUB_KEY` and `SOCIAL_AUTH_GITHUB_SECRET` in your config above
 
-### Configure an oAuth application for franklin
-1. create a superuser `docker-compose run web python manage.py createsuperuser`
-1. Login as super user as `http://192.168.99.100:5000/admin/`
-1. Navigate to `Oauth2_Provider --> Applications --> Add Application +`
-1. `user` -> superuser
-1. `Client Type` -> `Confidential`
-1. `Authorization Grant Type` -> `Resource Owner password-based`
-1. Save the `client id` and `client secret`
-
 ### Obtain a Github OAuth Token
 1. Log into Github
 1. Navigate to `Settings --> Personal Access Tokens --> Generate New Token`
@@ -77,31 +72,12 @@ Now with Github deploys!
 1. You will need to save the token as you will not be able to read it again. (regenerating it is easy though)
 
 ### Login/Create account with the api using Github oAuth creds above
-1. Make a POST call the api convert token endpoint. e.g. `http://192.168.99.100:5000/auth/convert-token/`
-1. Body type must be `x-www-form-urlencoded`
-1. Key/Values in body:
-1. `grant_type` -> `convert_token`
-1. `client_id` -> `<client-id-from-superuser-admin-step>`
-1. `client_secret` -> `<client-secret-from-superuser-admin-step>`
-1. `token` -> `<token-from-github-step>`
-1. `backend` -> `github`
-1. If successful, you should have a payload like below. All regular api calls
-   will require the `access_token` in the header to succeed. At this point you
-   should also observe that your github user is in the database and properly
-   linked to the social auth model.
-
-   ```
-    {
-        "access_token": "hNns5FjUxI9b613djPH6xqr4IaJvgM",
-        "expires_in": 36000,
-        "scope": "write read",
-        "token_type": "Bearer",
-        "refresh_token": "miE4TgZY19CggeRx8adaroVSPIIBwU"
-    }
-   ```
+1. All regular api calls will require the `access_token` in the header to 
+   succeed. After calling your first endpoint, you should observe that your 
+   github user is in the database and properly linked to the social auth model.
 
 ### Register one of your projects
-1. The project must have a `.franklin` file in it's root (see above)
+1. The project may optionally have a `.franklin` file in it's root (see above)
 1. You will make a POST call the api registration endpoint. e.g. `http://192.168.99.100:5000/register/`
 1. Header: `Authorization` -> `Bearer <access_token>`
 1. Body:
