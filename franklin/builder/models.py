@@ -193,7 +193,7 @@ class Environment(models.Model):
     branch = models.CharField(max_length=100, default='master')
     tag_regex = models.CharField(max_length=100, blank=True)
     url = models.CharField(
-        max_length=100, default='', db_index=True, blank=True)
+        max_length=100, default='', unique=True, blank=True)
     current_deploy = models.ForeignKey(
         Build, related_name='deployments', null=True, blank=True)
     past_builds = models.ManyToManyField(
