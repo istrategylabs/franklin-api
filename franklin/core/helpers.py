@@ -104,7 +104,11 @@ class SocialAuthentication(BaseAuthentication):
             backend = 'github'
             backend = load_backend(strategy, backend,
                                    reverse(path, args=(backend,)))
-            user = backend.do_auth(access_token=oauth_token)
+            try:
+                user = backend.do_auth(access_token=oauth_token)
+            except requests.HTTPError as e:
+                msg = e.response.json()
+                raise exceptions.AuthenticationFailed(msg)
             if not user:
                 msg = 'Bad credentials'
                 raise exceptions.AuthenticationFailed(msg)
