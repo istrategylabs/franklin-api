@@ -30,6 +30,7 @@ Now with Github deploys!
       SOCIAL_AUTH_GITHUB_KEY=<github_client_id>
       SOCIAL_AUTH_GITHUB_SECRET=<github_client_secret>
       GITHUB_SECRET=<for_validating_github_webhook_messages>    (random key used to secure communication with github)
+      CORS_WHITELIST=<url_or_urls_making_frontend_calls>
     ```
 - Projects you wish to be deployed by franklin will need a `.franklin` file in their root
 

@@ -70,7 +70,7 @@ MIDDLEWARE_CLASSES = (
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = (
-    'http://localhost:3000'
+    os.environ['CORS_WHITELIST'].split(',')
 )
 
 ROOT_URLCONF = 'config.urls'
