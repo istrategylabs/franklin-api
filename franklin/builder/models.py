@@ -192,8 +192,7 @@ class Environment(models.Model):
         max_length=3, choices=DEPLOY_CHOICES, default=BRANCH)
     branch = models.CharField(max_length=100, default='master')
     tag_regex = models.CharField(max_length=100, blank=True)
-    url = models.CharField(
-        max_length=100, default='', unique=True, blank=True)
+    url = models.CharField(max_length=100, unique=True)
     current_deploy = models.ForeignKey(
         Build, related_name='deployments', null=True, blank=True)
     past_builds = models.ManyToManyField(
@@ -231,7 +230,7 @@ class Environment(models.Model):
             self.save()
 
     def save(self, *args, **kwargs):
-        if self.current_deploy:
+        if not self.url:
             if self.name == self.site.DEFAULT_ENV:
                 self.url = "{0}.{1}".format(self.site.name,
                                             os.environ['BASE_URL'])
@@ -239,8 +238,9 @@ class Environment(models.Model):
                 self.url = "{0}-{1}.{2}".format(self.site.name,
                                                 self.name,
                                                 os.environ['BASE_URL'])
-            if not self.past_builds.filter(pk=self.current_deploy.pk).exists():
-                self.past_builds.add(self.current_deploy)
+        if (self.current_deploy and not
+                self.past_builds.filter(pk=self.current_deploy.pk).exists()):
+            self.past_builds.add(self.current_deploy)
         super(Environment, self).save(*args, **kwargs)
 
     def __str__(self):
