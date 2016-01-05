@@ -2,9 +2,9 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from builder.models import Owner, Site 
-from core.helpers import make_rest_get_call
 from .models import UserDetails
+from builder.models import Owner, Site
+
 
 class UserTestCase(TestCase):
     def setUp(self):
@@ -30,14 +30,20 @@ class UserTestCase(TestCase):
         """ Every user that is created should have details
         """
         self.assertIsInstance(self.user.details, UserDetails)
-    
+
     def test_user_has_repo_access(self):
-        """ Confirm that our user has access to admin the test site 
+        """ Confirm that our user has access to admin the test site
         """
         self.assertTrue(self.user.details.has_repo_access(self.site))
-    
+
     def test_user_has_repo_access_negative(self):
-        """ Confirm that our user has access to admin the test site 
+        """ Confirm that our user has access to admin the test site
         """
         self.repos[0]['permissions']['admin'] = False
         self.assertFalse(self.user.details.has_repo_access(self.site))
+    
+    def test_update_user_repo_access(self):
+        """ When updating the users repos, confirm that they still have access
+        """
+        self.user.details.update_repos_for_user(self.repos)
+        self.assertTrue(self.user.details.has_repo_access(self.site))

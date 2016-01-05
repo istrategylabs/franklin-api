@@ -1,5 +1,4 @@
 import logging
-import os
 from django.conf import settings
 from django.dispatch import receiver
 from django.db import models
@@ -7,7 +6,7 @@ from django.db.models.signals import post_save
 from django.utils.translation import ugettext as _
 
 from builder.models import Site
-from core.helpers import make_rest_get_call 
+from core.helpers import make_rest_get_call
 
 github_base = 'https://api.github.com/'
 logger = logging.getLogger(__name__)
@@ -18,8 +17,10 @@ class UserDetails(models.Model):
     github social signin
 
     :param user: FK to a unique user
+    :param sites: List of sites the user has permission to deploy
     """
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, related_name='details')
+    user = models.OneToOneField(
+            settings.AUTH_USER_MODEL, related_name='details')
     sites = models.ManyToManyField(Site, related_name='admins')
 
     def get_user_repos(self):
@@ -36,7 +37,7 @@ class UserDetails(models.Model):
 
         while have_next_page:
             response = None
-            have_next_page = False # when in doubt, we'll leave the loop after 1
+            have_next_page = False  # when in doubt, leave the loop after 1
             response = make_rest_get_call(url, headers)
 
             if response is not None:
@@ -60,7 +61,7 @@ class UserDetails(models.Model):
                     have_next_page = True
 
         if not repos:
-            logger.error('Failed to find repos for user', user.username)
+            logger.error('Failed to find repos for user', self.user.username)
         return repos
 
     def update_repos_for_user(self, repos):
@@ -83,7 +84,7 @@ class UserDetails(models.Model):
 
     def __str__(self):
         return self.user.username
-    
+
     class Meta(object):
         verbose_name = _('Detail')
         verbose_name_plural = _('Details')

@@ -232,11 +232,11 @@ class Environment(models.Model):
     def save(self, *args, **kwargs):
         if not self.url:
             if self.name == self.site.DEFAULT_ENV:
-                self.url = "{0}.{1}".format(self.site.name,
+                self.url = "{0}.{1}".format(self.site.name.lower(),
                                             os.environ['BASE_URL'])
             else:
-                self.url = "{0}-{1}.{2}".format(self.site.name,
-                                                self.name,
+                self.url = "{0}-{1}.{2}".format(self.site.name.lower(),
+                                                self.name.lower(),
                                                 os.environ['BASE_URL'])
         if (self.current_deploy and not
                 self.past_builds.filter(pk=self.current_deploy.pk).exists()):
