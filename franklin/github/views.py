@@ -68,16 +68,22 @@ def create_repo_webhook(site, user):
     return make_rest_post_call(url, headers, body)
 
 
-@api_view(['POST'])
-def register_repo(request):
+@api_view(['DELETE', 'POST'])
+def repository(request):
     """
-    Setup a project to be deployed by franklin
+    Register, Update, or Delete a Github project with franklin
     ---
 
     type:
-        201:
-            required: true
+        200:
             type: string
+            description: Successful Update
+        201:
+            type: string
+            description: Successful Creation
+        204:
+            type: string
+            decription: Successful Deletion
 
     request_serializer: SiteSerializer
     omit_serializer: false
@@ -85,6 +91,12 @@ def register_repo(request):
     parameters_strategy:
         form: merge
     parameters:
+        - name: name
+          type: string
+          required: true
+        - name: github_id
+          type: integer
+          required: true
         - name: owner
           pytype: builder.serializers.OwnerSerializer
           required: true
@@ -92,16 +104,15 @@ def register_repo(request):
         - code: 400
           message: Invalid json received or Bad Request from Github
         - code: 403
-          message: Current user does not have deployment permissions
+          message: Current user does not have permission for this repo
         - code: 422
           message: Validation error from Github
     """
-    if request.method == 'POST':
-        serializer = SiteSerializer(data=request.data)
-        if serializer and serializer.is_valid():
-            # TODO - Do this after we have the config instead?
-            site = serializer.save()
-            if request.user.details.has_repo_access(site):
+    serializer = SiteSerializer(data=request.data)
+    if serializer and serializer.is_valid():
+        site = serializer.save()
+        if request.user.details.has_repo_access(site):
+            if request.method == 'POST':
                 config = get_franklin_config(site, request.user)
                 if config and not hasattr(config, 'status_code'):
                     # Optional. Update DB with any relevant .franklin config
@@ -111,10 +122,13 @@ def register_repo(request):
                     return Response(status=response.status_code)
                 else:
                     return Response(status=status.HTTP_201_CREATED)
-            else:
-                message = 'Current user does not have deployment permissions'
-                logger.warn(message + ' | %s | %s', request.user, site)
-                return Response(message, status=status.HTTP_403_FORBIDDEN)
+            elif request.method == 'DELETE':
+                site.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            message = 'Current user does not have permission for this repo'
+            logger.warn(message + ' | %s | %s', request.user, site)
+            return Response(message, status=status.HTTP_403_FORBIDDEN)
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
