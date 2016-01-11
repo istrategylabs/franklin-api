@@ -99,22 +99,26 @@ class SocialAuthentication(BaseAuthentication):
                                     .first()
         if not social_user:
             # User does not exist in our DB, attempt social auth
-            strategy = load_strategy(request=request)
-            path = NAMESPACE + ":complete"
-            backend = 'github'
-            backend = load_backend(strategy, backend,
-                                   reverse(path, args=(backend,)))
-            try:
-                user = backend.do_auth(access_token=oauth_token)
-            except requests.HTTPError as e:
-                msg = e.response.json()
-                raise exceptions.AuthenticationFailed(msg)
-            if not user:
-                msg = 'Bad credentials'
-                raise exceptions.AuthenticationFailed(msg)
-            social = user.social_auth.get(provider='github')
-            social.extra_data['access_token'] = oauth_token
-            social.save()
+            user = do_auth(oauth_token)
         else:
             user = social_user.user
         return user, oauth_token
+
+def do_auth(oauth_token):
+    strategy = load_strategy()
+    path = NAMESPACE + ":complete"
+    backend = 'github'
+    backend = load_backend(strategy, backend,
+                           reverse(path, args=(backend,)))
+    try:
+        user = backend.do_auth(access_token=oauth_token)
+    except requests.HTTPError as e:
+        msg = e.response.json()
+        raise exceptions.AuthenticationFailed(msg)
+    if not user:
+        msg = 'Bad credentials'
+        raise exceptions.AuthenticationFailed(msg)
+    social = user.social_auth.get(provider='github')
+    social.extra_data['access_token'] = oauth_token
+    social.save()
+    return user

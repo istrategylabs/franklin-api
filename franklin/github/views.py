@@ -7,10 +7,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.helpers import make_rest_get_call, make_rest_post_call, GithubOnly
+from .serializers import GithubWebhookSerializer
 from builder.models import Site
 from builder.serializers import SiteSerializer
-from .serializers import GithubWebhookSerializer
+from core.helpers import make_rest_get_call, make_rest_post_call, do_auth,\
+                         GithubOnly
+from users.serializers import UserSerializer
 
 
 github_secret = os.environ['SOCIAL_AUTH_GITHUB_SECRET']
@@ -295,8 +297,11 @@ def get_access_token(request):
     if status.is_success(r.status_code):
         try:
             access_token = r.json().get('access_token', None)
+            user = do_auth(access_token)
+            serializer = UserSerializer(user)
             response_data = Response({
-                'token': access_token
+                'token': access_token,
+                'user': serializer.data
             }, status=status.HTTP_200_OK)
         except KeyError:
             response_data = Response({'status': 'Bad request',
