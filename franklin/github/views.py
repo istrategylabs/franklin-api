@@ -8,6 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from core.helpers import make_rest_get_call, make_rest_post_call, GithubOnly
+from builder.models import Site
 from builder.serializers import SiteSerializer
 from .serializers import GithubWebhookSerializer
 
@@ -68,10 +69,11 @@ def create_repo_webhook(site, user):
     return make_rest_post_call(url, headers, body)
 
 
-@api_view(['DELETE', 'POST'])
-def repository(request):
+@api_view(['GET', 'POST'])
+def repository_list(request):
     """
-    Register, Update, or Delete a Github project with franklin
+    Get all repos currently deployed by Franklin that the user can manage or
+    register a new repo
     ---
 
     type:
@@ -81,10 +83,8 @@ def repository(request):
         201:
             type: string
             description: Successful Creation
-        204:
-            type: string
-            decription: Successful Deletion
 
+    response_serializer: SiteSerializer
     request_serializer: SiteSerializer
     omit_serializer: false
 
@@ -107,51 +107,77 @@ def repository(request):
           message: Current user does not have permission for this repo
         - code: 422
           message: Validation error from Github
-    """
-    serializer = SiteSerializer(data=request.data)
-    if serializer and serializer.is_valid():
-        site = serializer.save()
-        if request.user.details.has_repo_access(site):
-            if request.method == 'POST':
-                config = get_franklin_config(site, request.user)
-                if config and not hasattr(config, 'status_code'):
-                    # Optional. Update DB with any relevant .franklin config
-                    pass
-                response = create_repo_webhook(site, request.user)
-                if not status.is_success(response.status_code):
-                    return Response(status=response.status_code)
-                else:
-                    return Response(status=status.HTTP_201_CREATED)
-            elif request.method == 'DELETE':
-                site.delete()
-                return Response(status=status.HTTP_204_NO_CONTENT)
-        else:
-            message = 'Current user does not have permission for this repo'
-            logger.warn(message + ' | %s | %s', request.user, site)
-            return Response(message, status=status.HTTP_403_FORBIDDEN)
-    return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['GET'])
-def deployed_repos(request):
-    """
-    All repos currently deployed by Franklin that the user can manage.
-    ---
-
-    response_serializer: SiteSerializer
-
-    responseMessages:
         - code: 500
           message: Error from Github.
     """
+
     if request.method == 'GET':
         if request.user.details.sites.count() == 0:
             github_repos = request.user.details.get_user_repos()
             # TODO - return error from github
             request.user.details.update_repos_for_user(github_repos)
-        site_data = request.user.details.sites.all()
-        serializer = SiteSerializer(site_data, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        sites = request.user.details.sites.all()
+        serializer = SiteSerializer(sites, many=True)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        serializer = SiteSerializer(data=request.data)
+        if serializer and serializer.is_valid():
+            site = serializer.save()
+            if not request.user.details.has_repo_access(site):
+                message = 'Current user does not have permission for this repo'
+                logger.warn(message + ' | %s | %s', request.user, site)
+                return Response(message, status=status.HTTP_403_FORBIDDEN)
+        config = get_franklin_config(site, request.user)
+        if config and not hasattr(config, 'status_code'):
+            # Optional. Update DB with any relevant .franklin config
+            pass
+        response = create_repo_webhook(site, request.user)
+        if not status.is_success(response.status_code):
+            return Response(status=response.status_code)
+        else:
+            return Response(status=status.HTTP_201_CREATED)
+    return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'DELETE'])
+def repository_detail(request, pk):
+    """
+    Rerieve or Delete a Github project with franklin
+    ---
+
+    type:
+        204:
+            type: string
+            decription: Successful Deletion
+
+    parameters:
+        - name: github_id
+          type: integer
+          description: The github id for the repo, passed in the URL
+          required: true
+    responseMessages:
+        - code: 400
+          message: Invalid json received or Bad Request from Github
+        - code: 403
+          message: Current user does not have permission for this repo
+        - code: 422
+          message: Validation error from Github
+    """
+
+    try:
+        site = Site.objects.get(github_id=pk)
+    except Site.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if not request.user.details.has_repo_access(site):
+        message = 'Current user does not have permission for this repo'
+        logger.warn(message + ' | %s | %s', request.user, site)
+        return Response(message, status=status.HTTP_403_FORBIDDEN)
+    if request.method == 'GET':
+        serializer = SiteSerializer(site)
+        return Response(serializer.data)
+    elif request.method == 'DELETE':
+        site.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['GET'])
