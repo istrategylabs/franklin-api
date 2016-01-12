@@ -20,7 +20,6 @@ Now with Github deploys!
 
 
     ```
-      BASE_PROJECT_PATH=~/Desktop                  (root folder where build will save built assets to)
       DJANGO_SETTINGS_MODULE=config.settings.local
       BASE_URL=franklinstatic.com
       SECRET_KEY=<your_secret_key>                 (random key used by django)

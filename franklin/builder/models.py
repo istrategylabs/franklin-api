@@ -97,9 +97,8 @@ class Build(models.Model):
     created = models.DateTimeField(auto_now_add=True, editable=False)
     path = models.CharField(max_length=100, blank=True)
 
-    def get_path(self, owner, site, name):
-        base = os.environ['BASE_PROJECT_PATH']
-        return "{0}/{1}/{2}/{3}".format(base, owner, site, name)
+    def get_path(self, site, name):
+        return "{0}/{1}".format(site, name)
 
 
 class TagBuild(Build):
@@ -111,8 +110,7 @@ class TagBuild(Build):
 
     def save(self, *args, **kwargs):
         clean_tag = re.sub('[^a-zA-Z0-9]', '', self.tag)
-        self.path = self.get_path(
-            self.site.owner.name, self.site.name, clean_tag)
+        self.path = self.get_path(self.site.github_id, clean_tag)
         super(TagBuild, self).save(*args, **kwargs)
 
     def __str__(self):
@@ -133,8 +131,7 @@ class BranchBuild(Build):
     branch = models.CharField(max_length=100)
 
     def save(self, *args, **kwargs):
-        self.path = self.get_path(
-            self.site.owner.name, self.site.name, self.git_hash)
+        self.path = self.get_path(self.site.github_id, self.git_hash)
         super(BranchBuild, self).save(*args, **kwargs)
 
     def __str__(self):

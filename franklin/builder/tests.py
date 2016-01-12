@@ -164,16 +164,13 @@ class BuildTestCase(TestCase):
 
     def test_tag_build_path(self):
         """ Test that object instantiation saves correct path. """
-        expected = "{base}/{owner}/{site}/{tag}".format(
-            base=os.environ['BASE_PROJECT_PATH'], owner=self.site.owner.name,
-            site=self.site.name, tag='v102')
+        expected = "{site}/{tag}".format(site=self.site.github_id, tag='v102')
         self.assertEqual(self.tag_build.path, expected)
 
     def test_branch_build_path(self):
         """ Test that object instantiation saves correct path. """
-        expected = "{base}/{owner}/{site}/{git_hash}".format(
-            base=os.environ['BASE_PROJECT_PATH'], owner=self.site.owner.name,
-            site=self.site.name, git_hash='asdf1234')
+        expected = "{site}/{git_hash}".format(site=self.site.github_id,
+                                              git_hash='asdf1234')
         self.assertEqual(self.branch_build.path, expected)
 
     def test_past_builds_lookup(self):
