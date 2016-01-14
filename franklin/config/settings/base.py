@@ -200,19 +200,26 @@ LOGGING = {
             'backupCount': LOGFILE_COUNT,
             'formatter': 'simple'
         },
+        'paper_trail': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_false'],
+            'class': 'logging.handlers.SysLogHandler',
+            'formatter': 'verbose',
+            'address': ('logs.papertrailapp.com', 63032)
+        }
     },
     'loggers': {
         'django.request': {
-            'handlers': ['console', 'dev_logfile', 'prod_logfile'],
+            'handlers': ['console', 'dev_logfile', 'prod_logfile', 'paper_trail'],
         },
         'builder': {
-            'handlers': ['console', 'dev_logfile', 'prod_logfile'],
+            'handlers': ['console', 'dev_logfile', 'prod_logfile', 'paper_trail'],
         },
         'github': {
-            'handlers': ['console', 'dev_logfile', 'prod_logfile'],
+            'handlers': ['console', 'dev_logfile', 'prod_logfile', 'paper_trail'],
         },
         'users': {
-            'handlers': ['console', 'dev_logfile', 'prod_logfile'],
+            'handlers': ['console', 'dev_logfile', 'prod_logfile', 'paper_trail'],
         },
     }
 }
