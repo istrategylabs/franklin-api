@@ -180,46 +180,24 @@ LOGGING = {
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
-            'formatter': 'simple'
-        },
-        'dev_logfile': {
-            'level': 'DEBUG',
-            'filters': ['require_debug_true'],
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'franklin_api_development.log',
-            'maxBytes': LOGFILE_SIZE,
-            'backupCount': LOGFILE_COUNT,
             'formatter': 'verbose'
-        },
-        'prod_logfile': {
-            'level': 'ERROR',
-            'filters': ['require_debug_false'],
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'franklin_api_production.log',
-            'maxBytes': LOGFILE_SIZE,
-            'backupCount': LOGFILE_COUNT,
-            'formatter': 'simple'
-        },
-        'paper_trail': {
-            'level': 'DEBUG',
-            'filters': ['require_debug_false'],
-            'class': 'logging.handlers.SysLogHandler',
-            'formatter': 'verbose',
-            'address': ('logs.papertrailapp.com', 63032)
         }
     },
     'loggers': {
         'django.request': {
-            'handlers': ['console', 'dev_logfile', 'prod_logfile', 'paper_trail'],
+            'handlers': ['console'],
         },
         'builder': {
-            'handlers': ['console', 'dev_logfile', 'prod_logfile', 'paper_trail'],
+            'handlers': ['console'],
         },
         'github': {
-            'handlers': ['console', 'dev_logfile', 'prod_logfile', 'paper_trail'],
+            'handlers': ['console'],
         },
         'users': {
-            'handlers': ['console', 'dev_logfile', 'prod_logfile', 'paper_trail'],
+            'handlers': ['console'],
+        },
+        'core': {
+            'handlers': ['console'],
         },
     }
 }
