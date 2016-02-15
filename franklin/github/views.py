@@ -151,12 +151,23 @@ def repository_list(request):
         if config and not hasattr(config, 'status_code'):
             # Optional. Update DB with any relevant .franklin config
             pass
+
+        # TODO - The below 422 checks are temporary fixes. #78 will have this
+        # happen less as we will delete webhooks from github when we remove
+        # repos from franklin-api. #53 will have us refactoring all errors
+        # returned from our external dependencies. It will need to handle cases
+        # like this where we get a potential non-error like this one.
         webhook_response = create_repo_webhook(site, request.user)
         if not status.is_success(webhook_response.status_code):
-            return Response(status=webhook_response.status_code)
+            if webhook_response.status_code != 422:
+                # This is some error other than webhook already exists
+                return Response(status=webhook_response.status_code)
         deploy_key_response = create_repo_deploy_key(site, request.user)
         if not status.is_success(deploy_key_response.status_code):
-            return Response(status=deploy_key_response.status_code)
+            if deploy_key_response.status_code != 422:
+                # This is some error other than deploy_key already exists
+                return Response(status=deploy_key_response.status_code)
+
         return Response(status=status.HTTP_201_CREATED)
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
