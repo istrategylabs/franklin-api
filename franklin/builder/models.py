@@ -207,7 +207,7 @@ class Environment(models.Model):
             url = os.environ['BUILDER_URL'] + '/build'
             headers = {'content-type': 'application/json'}
             body = {
-                "deploy_key": os.environ['GITHUB_OAUTH'],
+                "deploy_key": self.site.deploy_key,
                 "branch": branch,
                 "tag": tag,
                 "git_hash": git_hash,

@@ -71,6 +71,24 @@ def create_repo_webhook(site, user):
     return make_rest_post_call(url, headers, body)
 
 
+def create_repo_deploy_key(site, user):
+    # TODO - check for existing and update if needed (or skip)
+    social = user.social_auth.get(provider='github')
+    token = social.extra_data['access_token']
+
+    headers = {
+                'content-type': 'application/json',
+                'Authorization': 'token ' + token
+              }
+    body = {
+                'title': 'franklin readonly deploy key',
+                'key': site.deploy_key,
+                'read_only': True
+            }
+    url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/keys'
+    return make_rest_post_call(url, headers, body)
+
+
 @api_view(['GET', 'POST'])
 def repository_list(request):
     """
@@ -133,11 +151,13 @@ def repository_list(request):
         if config and not hasattr(config, 'status_code'):
             # Optional. Update DB with any relevant .franklin config
             pass
-        response = create_repo_webhook(site, request.user)
-        if not status.is_success(response.status_code):
-            return Response(status=response.status_code)
-        else:
-            return Response(status=status.HTTP_201_CREATED)
+        webhook_response = create_repo_webhook(site, request.user)
+        if not status.is_success(webhook_response.status_code):
+            return Response(status=webhook_response.status_code)
+        deploy_key_response = create_repo_deploy_key(site, request.user)
+        if not status.is_success(deploy_key_response.status_code):
+            return Response(status=deploy_key_response.status_code)
+        return Response(status=status.HTTP_201_CREATED)
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
 

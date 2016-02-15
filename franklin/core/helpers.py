@@ -8,6 +8,7 @@ import sys
 
 from django.core.urlresolvers import reverse
 
+from Crypto.PublicKey import RSA
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
 from rest_framework import status, permissions
@@ -59,8 +60,9 @@ def make_rest_post_call(url, headers, body):
 
 
 def generate_ssh_keys():
-    # TODO - use https://pypi.python.org/pypi/pycrypto here after 2.7 comes out
-    return (None, None)
+    key = RSA.generate(2048)
+    pubkey = key.publickey().exportKey('OpenSSH')
+    return (pubkey.decode('UTF8'), key.exportKey('PEM').decode('UTF8'))
 
 
 class GithubOnly(permissions.BasePermission):
@@ -103,6 +105,7 @@ class SocialAuthentication(BaseAuthentication):
         else:
             user = social_user.user
         return user, oauth_token
+
 
 def do_auth(oauth_token):
     strategy = load_strategy()
