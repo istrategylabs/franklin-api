@@ -40,7 +40,7 @@ class SiteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Site
-        fields = ('name', 'github_id', 'owner', 'environments')
+        fields = ('name', 'github_id', 'owner', 'environments', 'is_active')
         # Not ideal, but you can't update existing models without disabling
         # validation for our unique=True github_id
         # This is a known issue in DRF:

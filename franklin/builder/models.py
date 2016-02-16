@@ -37,6 +37,9 @@ class Site(models.Model):
     :param github_id: Unique ID github has assigned the project
     :param deploy_key: Token used to access the project on github
     :param deploy_key_secret: Secret portion of the deploy_key
+    :param deploy_key_id: The id in Github's DB for the key they have stored
+    :param webhook_id: The id in Github's DB for the webhook they have stored
+    :param is_active: If False, means the site is marked for deletion
     """
     DEFAULT_ENV = _('Production')
 
@@ -45,27 +48,31 @@ class Site(models.Model):
     github_id = models.PositiveIntegerField(unique=True)
     deploy_key = models.TextField(blank=True, null=True)
     deploy_key_secret = models.TextField(blank=True, null=True)
+    deploy_key_id = models.CharField(blank=True, null=True, max_length=12)
+    webhook_id = models.CharField(blank=True, null=True, max_length=12)
+    is_active = models.BooleanField(default=True)
 
     def get_deployable_event(self, github_event):
-        git_hash = github_event.get_event_hash()
-        event = github_event.get_change_location()
-        is_tag_event = github_event.is_tag_event()
+        if self.is_active:
+            git_hash = github_event.get_event_hash()
+            event = github_event.get_change_location()
+            is_tag_event = github_event.is_tag_event()
 
-        build = None
-        for env in self.environments.all():
-            if (env.deploy_type == Environment.BRANCH and not
-                    is_tag_event and event.endswith(env.branch)):
-                build, created = BranchBuild.objects.get_or_create(
-                    git_hash=git_hash, branch=env.branch, site=self)
-            elif (env.deploy_type == Environment.TAG and
-                    is_tag_event and re.match(env.tag_regex, event)):
-                build, created = TagBuild.objects.get_or_create(
-                    tag=event, site=self)
+            build = None
+            for env in self.environments.all():
+                if (env.deploy_type == Environment.BRANCH and not
+                        is_tag_event and event.endswith(env.branch)):
+                    build, created = BranchBuild.objects.get_or_create(
+                        git_hash=git_hash, branch=env.branch, site=self)
+                elif (env.deploy_type == Environment.TAG and
+                        is_tag_event and re.match(env.tag_regex, event)):
+                    build, created = TagBuild.objects.get_or_create(
+                        tag=event, site=self)
 
-            if build:
-                env.current_deploy = build
-                env.save()
-                return env
+                if build:
+                    env.current_deploy = build
+                    env.save()
+                    return env
         return None
 
     def save(self, *args, **kwargs):

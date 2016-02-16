@@ -21,42 +21,41 @@ from social.apps.django_app.utils import load_backend, load_strategy
 logger = logging.getLogger(__name__)
 
 
-def make_rest_get_call(url, headers):
+def make_rest_call(method, url, headers, data=None):
     response = None
     try:
-        response = requests.get(url, headers=headers)
+        if method == 'GET':
+            response = requests.get(url, headers=headers)
+        elif method == 'DELETE':
+            response = requests.delete(url, headers=headers)
+        elif method == 'POST':
+            response = requests.post(url, data=data, headers=headers)
     except (ConnectionError, HTTPError, Timeout) as e:
-        logger.error('REST GET Connection exception : %s', e)
+        logger.error('REST %s Connection exception : %s', method, e)
     except:
-        logger.error('Unexpected REST GET error: %s', sys.exc_info()[0])
+        logger.error('Unexpected REST %s error: %s', method, sys.exc_info()[0])
 
     if response is not None:
         if not status.is_success(response.status_code):
-            logger.warn('Bad GET response code of %s', response.status_code)
+            logger.warn('Bad %s response code of %s',
+                        method, response.status_code)
     else:
-        logger.error('GET response was None. This shouldn\'t happen')
+        logger.error('%s response was None. This shouldn\'t happen', method)
         response = requests.Response()
         response.status_code = 500
     return response
+
+
+def make_rest_delete_call(url, headers):
+    return make_rest_call('DELETE', url, headers)
+
+
+def make_rest_get_call(url, headers):
+    return make_rest_call('GET', url, headers)
 
 
 def make_rest_post_call(url, headers, body):
-    response = None
-    try:
-        response = requests.post(url, data=json.dumps(body), headers=headers)
-    except (ConnectionError, HTTPError, Timeout) as e:
-        logger.error('REST POST Connection exception : %s', e)
-    except:
-        logger.error('Unexpected REST POST error: %s', sys.exc_info()[0])
-
-    if response is not None:
-        if not status.is_success(response.status_code):
-            logger.warn('Bad POST response code of %s', response.status_code)
-    else:
-        logger.error('POST response was None. This shouldn\'t happen')
-        response = requests.Response()
-        response.status_code = 500
-    return response
+    return make_rest_call('POST', url, headers, json.dumps(body))
 
 
 def generate_ssh_keys():

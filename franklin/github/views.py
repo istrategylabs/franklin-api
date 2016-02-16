@@ -1,92 +1,21 @@
 import logging
 import os
-import yaml
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from .api import create_repo_deploy_key, create_repo_webhook, \
+        delete_deploy_key, delete_webhook, get_access_token, \
+        get_franklin_config
 from .serializers import GithubWebhookSerializer
 from builder.models import Site
 from builder.serializers import SiteSerializer
-from core.helpers import make_rest_get_call, make_rest_post_call, do_auth,\
-                         GithubOnly
-from users.serializers import UserSerializer
+from core.helpers import GithubOnly
 
-
-github_secret = os.environ['SOCIAL_AUTH_GITHUB_SECRET']
-base_url = os.environ['API_BASE_URL']
-github_base = 'https://api.github.com/'
 
 logger = logging.getLogger(__name__)
-
-
-def get_franklin_config(site, user):
-    url = github_base + 'repos/' + site.owner.name + '/'\
-            + site.name + '/contents/.franklin.yml'
-    # TODO - This will fetch the file from the default master branch
-    social = user.social_auth.get(provider='github')
-    token = social.extra_data['access_token']
-    headers = {
-                'content-type': 'application/json',
-                'Authorization': 'token ' + token
-              }
-    config_metadata = make_rest_get_call(url, headers)
-
-    if status.is_success(config_metadata.status_code):
-        download_url = config_metadata.json().get('download_url', None)
-        config_payload = make_rest_get_call(download_url, None)
-        if status.is_success(config_payload.status_code):
-            # TODO - validation and cleanup needed here similar to:
-            # http://stackoverflow.com/a/22231372
-            franklin_config = yaml.load(config_payload.text)
-            return franklin_config
-        else:
-            return config_payload
-    return config_metadata
-
-
-def create_repo_webhook(site, user):
-    # TODO - check for existing webhook and update if needed (or skip)
-    social = user.social_auth.get(provider='github')
-    token = social.extra_data['access_token']
-
-    # TODO - Confirm that a header token is the best/most secure way to go
-    headers = {
-                'content-type': 'application/json',
-                'Authorization': 'token ' + token
-              }
-    body = {
-                'name': 'web',
-                'events': ['push'],
-                'active': True,
-                'config': {
-                                'url': base_url + 'deployed/',
-                                'content_type': 'json',
-                                'secret': os.environ['GITHUB_SECRET']
-                          }
-            }
-    url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/hooks'
-    return make_rest_post_call(url, headers, body)
-
-
-def create_repo_deploy_key(site, user):
-    # TODO - check for existing and update if needed (or skip)
-    social = user.social_auth.get(provider='github')
-    token = social.extra_data['access_token']
-
-    headers = {
-                'content-type': 'application/json',
-                'Authorization': 'token ' + token
-              }
-    body = {
-                'title': 'franklin readonly deploy key',
-                'key': site.deploy_key,
-                'read_only': True
-            }
-    url = github_base + 'repos/' + site.owner.name + '/' + site.name + '/keys'
-    return make_rest_post_call(url, headers, body)
 
 
 @api_view(['GET', 'POST'])
@@ -136,40 +65,50 @@ def repository_list(request):
             github_repos = request.user.details.get_user_repos()
             # TODO - return error from github
             request.user.details.update_repos_for_user(github_repos)
-        sites = request.user.details.sites.all()
+        sites = request.user.details.sites.filter(is_active=True).all()
         serializer = SiteSerializer(sites, many=True)
         return Response(serializer.data)
     elif request.method == 'POST':
+        # TODO - #53 will have us refactoring all errors returned from our
+        # external dependencies. It will need to handle cases like this where
+        # we get a potential non-error like this one.
         serializer = SiteSerializer(data=request.data)
         if serializer and serializer.is_valid():
+            try:
+                site = Site.objects.get(github_id=request.data['github_id'])
+                return Response('Resource already exists', status=422)
+            except Site.DoesNotExist:
+                pass  # Expected
             site = serializer.save()
             if not request.user.details.has_repo_access(site):
                 message = 'Current user does not have permission for this repo'
                 logger.warn(message + ' | %s | %s', request.user, site)
                 return Response(message, status=status.HTTP_403_FORBIDDEN)
-        config = get_franklin_config(site, request.user)
-        if config and not hasattr(config, 'status_code'):
-            # Optional. Update DB with any relevant .franklin config
-            pass
 
-        # TODO - The below 422 checks are temporary fixes. #78 will have this
-        # happen less as we will delete webhooks from github when we remove
-        # repos from franklin-api. #53 will have us refactoring all errors
-        # returned from our external dependencies. It will need to handle cases
-        # like this where we get a potential non-error like this one.
-        webhook_response = create_repo_webhook(site, request.user)
-        if not status.is_success(webhook_response.status_code):
-            if webhook_response.status_code != 422:
-                # This is some error other than webhook already exists
-                return Response(status=webhook_response.status_code)
-        deploy_key_response = create_repo_deploy_key(site, request.user)
-        if not status.is_success(deploy_key_response.status_code):
-            if deploy_key_response.status_code != 422:
-                # This is some error other than deploy_key already exists
-                return Response(status=deploy_key_response.status_code)
+        retrieve_franklin_config_file(site, request.user)
 
-        return Response(status=status.HTTP_201_CREATED)
+        # Call Github to register a webhook
+        webhook_r = create_repo_webhook(site, request.user)
+        if (status.is_success(webhook_r.status_code) or
+                webhook_r.status_code == 422):
+            site.webhook_id = webhook_r.json().get('id', '')
+            # Call Github to register a deploy key
+            deploy_key_r = create_repo_deploy_key(site, request.user)
+            if (status.is_success(deploy_key_r.status_code) or
+                    deploy_key_r.status_code == 422):
+                site.deploy_key_id = deploy_key_r.json().get('id', '')
+                site.save()
+                return Response(status=status.HTTP_201_CREATED)
+        delete_site(site, request.user)
     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+def retrieve_franklin_config_file(site, user):
+    # Call Github for franklin config
+    config = get_franklin_config(site, user)
+    if config and not hasattr(config, 'status_code'):
+        # Optional. Update DB with any relevant .franklin config
+        pass
 
 
 @api_view(['GET', 'DELETE'])
@@ -209,8 +148,24 @@ def repository_detail(request, pk):
         serializer = SiteSerializer(site)
         return Response(serializer.data)
     elif request.method == 'DELETE':
-        site.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        site.is_active = False
+        site.save()
+        return delete_site(site, request.user)
+
+
+def delete_site(site, user):
+    # TODO - This should be an async process that is thrown into a queue. The
+    # site is no longer active, so the actual delete can occur lazily.
+    webhook_delete_response = delete_webhook(site, user)
+    if status.is_success(webhook_delete_response.status_code):
+        deploy_key_delete_response = delete_deploy_key(site, user)
+        if status.is_success(deploy_key_delete_response.status_code):
+            site.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            message = 'Github deleted the webhook, but not the deploy key'
+            logger.warn(message + ' | %s | %s', user, site)
+    return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -300,48 +255,6 @@ def deploy_hook(request):
         # Invalid methods are caught at a higher level
         pass
     return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-def get_access_token(request):
-    """
-    Tries to get the access token from an OAuth Provider
-    :param request:
-    :param backend:
-    :return:
-    """
-    url = 'https://github.com/login/oauth/access_token'
-    secret = github_secret
-
-    headers = {
-        'content-type': 'application/json',
-        'accept': 'application/json'
-    }
-    params = {
-        "code": request.data.get('code'),
-        "client_id": request.data.get('clientId'),
-        "redirect_uri": request.data.get('redirectUri'),
-        "client_secret": secret
-    }
-
-    # Exchange authorization code for access token.
-    r = make_rest_post_call(url, headers, params)
-    if status.is_success(r.status_code):
-        try:
-            access_token = r.json().get('access_token', None)
-            user = do_auth(access_token)
-            serializer = UserSerializer(user)
-            response_data = Response({
-                'token': access_token,
-                'user': serializer.data
-            }, status=status.HTTP_200_OK)
-        except KeyError:
-            response_data = Response({'status': 'Bad request',
-                                      'message': 'Authentication could not be\
-                                              performed with received data.'},
-                                     status=status.HTTP_400_BAD_REQUEST)
-        return response_data
-    else:
-        return Response(status=r.status_code)
 
 
 @api_view(['POST'])
