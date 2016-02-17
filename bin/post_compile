@@ -2,4 +2,4 @@
 
 mkdir ./config && curl http://s3.amazonaws.com/rds-downloads/rds-combined-ca-bundle.pem > ./config/amazon-rds-ca-cert.pem
 
-python manage.py migrate
+python franklin/manage.py migrate
