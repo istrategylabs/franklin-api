@@ -45,7 +45,6 @@ INSTALLED_APPS = (
     # third part apps
     'rest_framework',
     'social.apps.django_app.default',
-    'rest_framework_swagger',
     'corsheaders',
 
     # Local apps
@@ -200,9 +199,4 @@ LOGGING = {
             'handlers': ['console'],
         },
     }
-}
-
-SWAGGER_SETTINGS = {
-    "exclude_namespaces": [],
-    "api_version": 'v0.3.0-alpha',
 }

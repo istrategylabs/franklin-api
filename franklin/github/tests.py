@@ -55,7 +55,7 @@ class OauthTokenTestCase(TestCase):
         self.site = Site.objects.create(
             owner=self.owner, name='franklin-dashboard', github_id=45864453)
 
-    @mock.patch('github.api.do_auth')
+    @mock.patch('github.views.do_auth')
     @mock.patch('github.api.make_rest_post_call')
     def test_get_franklin_config(self, mock_post, mock_auth):
         """ Tests the method to fetch an oauth token

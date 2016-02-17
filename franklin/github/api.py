@@ -2,11 +2,9 @@ import os
 import yaml
 
 from rest_framework import status
-from rest_framework.response import Response
 
 from core.helpers import make_rest_delete_call, make_rest_get_call, \
-        make_rest_post_call, do_auth
-from users.serializers import UserSerializer
+        make_rest_post_call
 
 
 def get_auth_header(user):
@@ -93,7 +91,7 @@ def delete_webhook(site, user):
 
 def get_access_token(request):
     """
-    Tries to get the access token from an OAuth Provider
+    Converts a temporary auth token for an OAuth access token from Github
     """
     url = 'https://github.com/login/oauth/access_token'
     headers = {
@@ -106,23 +104,4 @@ def get_access_token(request):
         "redirect_uri": request.data.get('redirectUri'),
         "client_secret": os.environ['SOCIAL_AUTH_GITHUB_SECRET']
     }
-
-    # Exchange authorization code for access token.
-    r = make_rest_post_call(url, headers, params)
-    if status.is_success(r.status_code):
-        try:
-            access_token = r.json().get('access_token', None)
-            user = do_auth(access_token)
-            serializer = UserSerializer(user)
-            response_data = Response({
-                'token': access_token,
-                'user': serializer.data
-            }, status=status.HTTP_200_OK)
-        except KeyError:
-            response_data = Response({'status': 'Bad request',
-                                      'message': 'Authentication could not be\
-                                              performed with received data.'},
-                                     status=status.HTTP_400_BAD_REQUEST)
-        return response_data
-    else:
-        return Response(status=r.status_code)
+    return make_rest_post_call(url, headers, params)

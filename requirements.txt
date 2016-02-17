@@ -7,7 +7,6 @@ djangorestframework==3.2.2
 gunicorn==19.3.0
 pyyaml==3.11
 python-social-auth==0.2.13
-django-rest-swagger==0.3.4
 django-cors-headers==1.1.0
 raven==5.10.2
 pycryptodome==3.4
