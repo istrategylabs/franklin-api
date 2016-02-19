@@ -214,7 +214,7 @@ class Environment(models.Model):
             url = os.environ['BUILDER_URL'] + '/build'
             headers = {'content-type': 'application/json'}
             body = {
-                "deploy_key": self.site.deploy_key,
+                "deploy_key": self.site.deploy_key_secret,
                 "branch": branch,
                 "tag": tag,
                 "git_hash": git_hash,
