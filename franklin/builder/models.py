@@ -3,11 +3,13 @@ import os
 import re
 
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import ugettext as _
 
 from rest_framework import status
 
 from core.helpers import generate_ssh_keys, make_rest_post_call
+from github.api import get_default_branch
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +54,8 @@ class Site(models.Model):
     webhook_id = models.CharField(blank=True, null=True, max_length=12)
     is_active = models.BooleanField(default=True)
 
-    def get_deployable_event(self, github_event):
+    def get_deployable_event(self, event, git_hash, is_tag_event=False):
         if self.is_active:
-            git_hash = github_event.get_event_hash()
-            event = github_event.get_change_location()
-            is_tag_event = github_event.is_tag_event()
-
             build = None
             for env in self.environments.all():
                 if (env.deploy_type == Environment.BRANCH and not
@@ -74,6 +72,16 @@ class Site(models.Model):
                     env.save()
                     return env
         return None
+
+    def get_newest_commit(self, user):
+        """ Calls github and retrieves the current git hash of the most recent
+        code push to the default branch of the repo
+        """
+        return get_default_branch(self, user)
+
+    def get_default_environment(self):
+        return self.environments.filter(~Q(deploy_type=Environment.PROMOTE))\
+                                .first()
 
     def save(self, *args, **kwargs):
         if not self.deploy_key:

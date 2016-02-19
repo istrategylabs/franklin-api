@@ -40,7 +40,11 @@ class SiteTestCase(TestCase):
         """
         github_event = GithubWebhookSerializer(data=self.git_message)
         if github_event.is_valid():
-            matching_env = self.site.get_deployable_event(github_event)
+            event = github_event.get_change_location()
+            git_hash = github_event.get_event_hash()
+            is_tag_event = github_event.is_tag_event()
+            matching_env = self.site.get_deployable_event(
+                    event, git_hash, is_tag_event)
             self.assertEqual(matching_env, self.env)
         else:
             self.fail(github_event.errors)
@@ -53,7 +57,11 @@ class SiteTestCase(TestCase):
         self.git_message['ref'] = 'refs/heads/staging'
         github_event = GithubWebhookSerializer(data=self.git_message)
         if github_event.is_valid():
-            matching_env = self.site.get_deployable_event(github_event)
+            event = github_event.get_change_location()
+            git_hash = github_event.get_event_hash()
+            is_tag_event = github_event.is_tag_event()
+            matching_env = self.site.get_deployable_event(
+                    event, git_hash, is_tag_event)
             self.assertIsNone(matching_env)
         else:
             self.fail(github_event.errors)
@@ -71,7 +79,11 @@ class SiteTestCase(TestCase):
         self.git_message['ref_type'] = 'tag'
         github_event = GithubWebhookSerializer(data=self.git_message)
         if github_event.is_valid():
-            matching_env = self.site.get_deployable_event(github_event)
+            event = github_event.get_change_location()
+            git_hash = github_event.get_event_hash()
+            is_tag_event = github_event.is_tag_event()
+            matching_env = self.site.get_deployable_event(
+                    event, git_hash, is_tag_event)
             self.assertEqual(matching_env, self.env)
         else:
             self.fail(github_event.errors)

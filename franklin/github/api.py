@@ -6,6 +6,9 @@ from rest_framework import status
 from core.helpers import make_rest_delete_call, make_rest_get_call, \
         make_rest_post_call
 
+repo_base_url = 'https://api.github.com/repo'
+repos_base_url = 'https://api.github.com/repos'
+
 
 def get_auth_header(user):
     social = user.social_auth.get(provider='github')
@@ -18,13 +21,20 @@ def get_auth_header(user):
     return headers
 
 
-def build_url(owner, repo, endpoint=''):
-    base = 'https://api.github.com/repos'
-    return '{0}/{1}/{2}/{3}'.format(base, owner, repo, endpoint)
+def build_repo_url(owner, repo, endpoint=''):
+    return '{0}/{1}/{2}/{3}'.format(repo_base_url, owner, repo, endpoint)
+
+
+def build_repos_url(owner, repo, endpoint=''):
+    return '{0}/{1}/{2}/{3}'.format(repos_base_url, owner, repo, endpoint)
+
+
+def build_repos_root_url(owner, repo):
+    return '{0}/{1}/{2}'.format(repos_base_url, owner, repo)
 
 
 def get_franklin_config(site, user):
-    url = build_url(site.owner.name, site.name, 'contents/.franklin.yml')
+    url = build_repos_url(site.owner.name, site.name, 'contents/.franklin.yml')
     # TODO - This will fetch the file from the default master branch
     headers = get_auth_header(user)
     config_metadata = make_rest_get_call(url, headers)
@@ -44,10 +54,10 @@ def get_franklin_config(site, user):
 
 def create_repo_deploy_key(site, user):
     # TODO - check for existing and update if needed (or skip)
-    url = build_url(site.owner.name, site.name, 'keys')
+    url = build_repos_url(site.owner.name, site.name, 'keys')
     headers = get_auth_header(user)
     body = {
-                'title': 'franklin readonly deploy key',
+                'title': 'franklin',
                 'key': site.deploy_key,
                 'read_only': True
             }
@@ -57,7 +67,7 @@ def create_repo_deploy_key(site, user):
 def delete_deploy_key(site, user):
     if site.deploy_key_id:
         endpoint = 'keys/' + site.deploy_key_id
-        url = build_url(site.owner.name, site.name, endpoint)
+        url = build_repos_url(site.owner.name, site.name, endpoint)
         headers = get_auth_header(user)
         return make_rest_delete_call(url, headers)
     return None
@@ -65,7 +75,7 @@ def delete_deploy_key(site, user):
 
 def create_repo_webhook(site, user):
     # TODO - check for existing webhook and update if needed (or skip)
-    url = build_url(site.owner.name, site.name, 'hooks')
+    url = build_repos_url(site.owner.name, site.name, 'hooks')
     headers = get_auth_header(user)
     body = {
                 'name': 'web',
@@ -83,7 +93,7 @@ def create_repo_webhook(site, user):
 def delete_webhook(site, user):
     if site.webhook_id:
         endpoint = 'hooks/' + site.webhook_id
-        url = build_url(site.owner.name, site.name, endpoint)
+        url = build_repos_url(site.owner.name, site.name, endpoint)
         headers = get_auth_header(user)
         return make_rest_delete_call(url, headers)
     return None
@@ -105,3 +115,21 @@ def get_access_token(request):
         "client_secret": os.environ['SOCIAL_AUTH_GITHUB_SECRET']
     }
     return make_rest_post_call(url, headers, params)
+
+
+def get_default_branch(site, user):
+    default_branch = ''
+    git_hash = ''
+    url = build_repos_root_url(site.owner.name, site.name)
+    headers = get_auth_header(user)
+    repo_details = make_rest_get_call(url, headers)
+
+    if status.is_success(repo_details.status_code):
+        default_branch = repo_details.json().get('default_branch', None)
+        branch_url = build_repos_url(
+                site.owner.name, site.name, 'branches/' + default_branch)
+        branch_details = make_rest_get_call(branch_url, headers)
+        if (status.is_success(branch_details.status_code) and
+                branch_details.json().get('commit', None)):
+            git_hash = branch_details.json()['commit'].get('sha', None)
+    return (default_branch, git_hash)

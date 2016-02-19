@@ -11,7 +11,8 @@ from .api import create_repo_deploy_key, create_repo_webhook, \
         get_franklin_config
 from .serializers import GithubWebhookSerializer
 from builder.models import Site
-from builder.serializers import SiteSerializer
+from builder.serializers import FlatSiteSerializer, SiteSerializer
+
 from core.helpers import GithubOnly, do_auth
 from users.serializers import UserSerializer
 
@@ -31,7 +32,7 @@ def repository_list(request):
             # TODO - return error from github
             request.user.details.update_repos_for_user(github_repos)
         sites = request.user.details.sites.filter(is_active=True).all()
-        site_serializer = SiteSerializer(sites, many=True)
+        site_serializer = FlatSiteSerializer(sites, many=True)
         user_serializer = UserSerializer(request.user)
         return Response({
             'repos': site_serializer.data,
@@ -94,7 +95,7 @@ def repository_detail(request, pk):
         logger.warn(message + ' | %s | %s', request.user, site)
         return Response(message, status=status.HTTP_403_FORBIDDEN)
     if request.method == 'GET':
-        site_serializer = SiteSerializer(site)
+        site_serializer = SiteSerializer(site, context={'user': request.user})
         user_serializer = UserSerializer(request.user)
         return Response({
             'repo': site_serializer.data,
@@ -145,8 +146,29 @@ def deployable_repos(request):
 
 
 @api_view(['POST'])
+def deploy(request, pk):
+    """
+    Attempt to build and deploy a site given a branch/hash
+    """
+    try:
+        site = Site.objects.get(github_id=pk)
+    except Site.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    # TODO - There is a check above for "user has permissions". We should
+    # convert that to a mixin. We migth be able to do that with this
+    # try/catch as well.
+    if request.method == 'POST':
+        branch = request.data.get('branch', None)
+        git_hash = request.data.get('git_hash', None)
+        if branch and git_hash:
+            deploy_site(site, branch, git_hash)
+            return Response(status=status.HTTP_201_CREATED)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
 @permission_classes((GithubOnly, ))
-def deploy_hook(request):
+def github_webhook(request):
     """
     Private endpoint that should only be called from Github
     """
@@ -158,18 +180,15 @@ def deploy_hook(request):
                 if github_event and github_event.is_valid():
                     site = github_event.get_existing_site()
                     if site:
-                        environment = site.get_deployable_event(github_event)
-                        if environment:
-                            # This line helps with testing.
-                            # We will remove once we add mocking.
-                            if os.environ['ENV'] is not 'test':
-                                environment.build()
-                                return Response(status=status.HTTP_201_CREATED)
-                        else:
-                            # Likely a webhook we don't build for.
-                            return Response(status=status.HTTP_200_OK)
+                        event = github_event.get_change_location()
+                        git_hash = github_event.get_event_hash()
+                        is_tag_event = github_event.is_tag_event()
+                        deploy_site(site, event, git_hash, is_tag_event)
+                        return Response(status=status.HTTP_201_CREATED)
                 else:
                     logger.warning("Received invalid Github Webhook message")
+                # Likely a webhook we don't build for.
+                return Response(status=status.HTTP_200_OK)
             elif event_type == 'ping':
                 # TODO - update the DB with some important info here
                 # repository{
@@ -184,6 +203,16 @@ def deploy_hook(request):
         # Invalid methods are caught at a higher level
         pass
     return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+def deploy_site(site, event, git_hash, is_tag_event=False):
+    environment = site.get_deployable_event(event, git_hash, is_tag_event)
+    if environment:
+        # TODO - It's high time we actually mock this??
+        # This line helps with testing.
+        # We will remove once we add mocking.
+        if os.environ['ENV'] is not 'test':
+            environment.build()
 
 
 @api_view(['GET', 'POST'])
