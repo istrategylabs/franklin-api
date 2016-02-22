@@ -1,6 +1,8 @@
 import os
 import yaml
 
+from django.core.urlresolvers import reverse
+
 from rest_framework import status
 
 from core.helpers import make_rest_delete_call, make_rest_get_call, \
@@ -82,7 +84,7 @@ def create_repo_webhook(site, user):
                 'events': ['push'],
                 'active': True,
                 'config': {
-                    'url': os.environ['API_BASE_URL'] + 'deployed/',
+                    'url': os.environ['API_BASE_URL'] + reverse('webhook'),
                     'content_type': 'json',
                     'secret': os.environ['GITHUB_SECRET']
                 }
