@@ -9,7 +9,7 @@ from django.utils.translation import ugettext as _
 from rest_framework import status
 
 from core.helpers import generate_ssh_keys, make_rest_post_call
-from github.api import get_default_branch
+from github.api import get_branch_details, get_default_branch
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,9 @@ class Site(models.Model):
         """ Calls github and retrieves the current git hash of the most recent
         code push to the default branch of the repo
         """
-        return get_default_branch(self, user)
+        branch = get_default_branch(self, user)
+        git_hash = get_branch_details(self, user, branch)
+        return (branch, git_hash)
 
     def get_default_environment(self):
         return self.environments.filter(~Q(deploy_type=Environment.PROMOTE))\
@@ -87,8 +89,6 @@ class Site(models.Model):
         if not self.deploy_key:
             self.deploy_key, self.deploy_key_secret = generate_ssh_keys()
         super(Site, self).save(*args, **kwargs)
-        if not self.environments.exists():
-            self.environments.create(name=self.DEFAULT_ENV)
 
     def __str__(self):
         return self.name

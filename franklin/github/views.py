@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from .api import create_repo_deploy_key, create_repo_webhook, \
         delete_deploy_key, delete_webhook, get_access_token, \
-        get_franklin_config
+        get_default_branch, get_franklin_config
 from .serializers import GithubWebhookSerializer
 from builder.models import Site
 from builder.serializers import FlatSiteSerializer, SiteSerializer
@@ -68,6 +68,10 @@ def repository_list(request):
                     deploy_key_r.status_code == 422):
                 site.deploy_key_id = deploy_key_r.json().get('id', '')
                 site.save()
+                if not site.environments.exists():
+                    branch = get_default_branch(site, request.user)
+                    site.environments.create(name=site.DEFAULT_ENV,
+                                             branch=branch)
                 return Response(status=status.HTTP_201_CREATED)
         delete_site(site, request.user)
     return Response(status=status.HTTP_400_BAD_REQUEST)

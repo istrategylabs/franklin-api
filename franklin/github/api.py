@@ -120,18 +120,20 @@ def get_access_token(request):
 
 
 def get_default_branch(site, user):
-    default_branch = ''
-    git_hash = ''
     url = build_repos_root_url(site.owner.name, site.name)
     headers = get_auth_header(user)
-    repo_details = make_rest_get_call(url, headers)
+    result = make_rest_get_call(url, headers)
 
-    if status.is_success(repo_details.status_code):
-        default_branch = repo_details.json().get('default_branch', None)
-        branch_url = build_repos_url(
-                site.owner.name, site.name, 'branches/' + default_branch)
-        branch_details = make_rest_get_call(branch_url, headers)
-        if (status.is_success(branch_details.status_code) and
-                branch_details.json().get('commit', None)):
-            git_hash = branch_details.json()['commit'].get('sha', None)
-    return (default_branch, git_hash)
+    if status.is_success(result.status_code):
+        return result.json().get('default_branch', None)
+    return ''
+
+
+def get_branch_details(site, user, branch):
+    url = build_repos_url(site.owner.name, site.name, 'branches/' + branch)
+    headers = get_auth_header(user)
+    result = make_rest_get_call(url, headers)
+    if (status.is_success(result.status_code) and
+            result.json().get('commit', None)):
+        return result.json()['commit'].get('sha', None)
+    return ''
