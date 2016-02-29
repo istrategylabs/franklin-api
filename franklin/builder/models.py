@@ -232,14 +232,20 @@ class Environment(models.Model):
                 "environment_id": self.id
                 }
 
-            response = make_rest_post_call(url, headers, body)
-            if not status.is_success(response.status_code):
-                logger.error("Negative response from Builder: %s",
-                             response.status_code)
-                self.status = self.FAILED
+            if self.can_build():
+                response = make_rest_post_call(url, headers, body)
+                if not status.is_success(response.status_code):
+                    logger.error("Negative response from Builder: %s",
+                                 response.status_code)
+                    self.status = self.FAILED
+                else:
+                    self.status = self.BUILDING
             else:
-                self.status = self.BUILDING
+                logger.error("Site already building...")
             self.save()
+
+    def can_build(self):
+        return self.status is not self.BUILDING
 
     def save(self, *args, **kwargs):
         if not self.url:
