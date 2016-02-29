@@ -213,7 +213,7 @@ class Environment(models.Model):
         max_length=3, choices=STATUS_CHOICES, default=REGISTERED)
 
     def build(self):
-        if self.current_deploy:
+        if self.can_build():
             is_tag_build = hasattr(self.current_deploy, 'tagbuild')
             branch = self.current_deploy.branch if not is_tag_build else ''
             tag = self.current_deploy.tag if is_tag_build else ''
@@ -231,21 +231,19 @@ class Environment(models.Model):
                 "repo_name": self.site.name,
                 "environment_id": self.id
                 }
-
-            if self.can_build():
-                response = make_rest_post_call(url, headers, body)
-                if not status.is_success(response.status_code):
-                    logger.error("Negative response from Builder: %s",
-                                 response.status_code)
-                    self.status = self.FAILED
-                else:
-                    self.status = self.BUILDING
+            response = make_rest_post_call(url, headers, body)
+            if not status.is_success(response.status_code):
+                logger.error("Negative response from Builder: %s",
+                             response.status_code)
+                self.status = self.FAILED
             else:
-                logger.error("Site already building...")
+                self.status = self.BUILDING
+        else:
+            logger.error("Site already building...")
             self.save()
 
     def can_build(self):
-        return self.status is not self.BUILDING
+        return self.status is not self.BUILDING and self.current_deploy
 
     def save(self, *args, **kwargs):
         if not self.url:
