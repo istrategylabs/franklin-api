@@ -10,7 +10,7 @@ from .api import create_repo_deploy_key, create_repo_webhook, \
         delete_deploy_key, delete_webhook, get_access_token, \
         get_default_branch, get_franklin_config
 from .serializers import GithubWebhookSerializer
-from builder.models import Site
+from builder.models import Site, Environment
 from builder.serializers import FlatSiteSerializer, SiteSerializer
 
 from core.helpers import GithubOnly, do_auth
@@ -168,6 +168,61 @@ def deploy(request, pk):
             deploy_site(site, branch, git_hash)
             return Response(status=status.HTTP_201_CREATED)
         return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST', 'DELETE'])
+def manage_environments(request, repo):
+    """
+    Create or Delete an environment
+    """
+    try:
+        site = Site.objects.get(github_id=repo)
+    except Site.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    if request.method == 'POST':
+        environment = site.get_default_environment()
+        parent_name = environment.name
+        if parent_name == 'Production':
+            new_name = 'Staging'
+            new_url = new_name.lower() + '-' + environment.url
+        elif parent_name == 'Staging':
+            new_name = 'Development'
+            new_url = new_name.lower() + '-' + environment.url[8:]
+        else:
+            message = {
+                'error': 'The maximum limit of 3 environments has been reached'
+            }
+            return Response(message, status=status.HTTP_400_BAD_REQUEST)
+
+        environment.pk = None  # Will be auto-generated, creating a new row
+        environment.name = new_name
+        environment.url = new_url
+        environment.save()
+
+        # Finally, update the parent environment to be promotion only
+        site.environments.filter(name=parent_name)\
+                         .update(deploy_type=Environment.PROMOTE)
+        return Response(status=status.HTTP_201_CREATED)
+    elif request.method == 'DELETE':
+        default_env = site.get_default_environment()
+        if default_env.name == 'Development':
+            # Staging will be the new base environment
+            staging = site.environments.filter(name='Staging').first()
+            staging.deploy_type = default_env.deploy_type
+            staging.save()
+            default_env.delete()
+        elif default_env.name == 'Staging':
+            # Pro will be the new base environment
+            prod = site.environments.filter(name='Production').first()
+            prod.deploy_type = default_env.deploy_type
+            prod.save()
+            default_env.delete()
+        else:
+            message = {
+                'error': 'You must have at least one environment'
+            }
+            return Response(message, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['POST'])
