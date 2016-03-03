@@ -226,6 +226,37 @@ def manage_environments(request, repo):
 
 
 @api_view(['POST'])
+def promote_environment(request, repo, env):
+    """
+    Promote an environment to a higher environment
+    """
+    try:
+        site = Site.objects.get(github_id=repo)
+        environment = Environment.objects.get(name__iexact=env, site=site)
+    except (Site.DoesNotExist, Environment.DoesNotExist) as e:
+        return Response(str(e), status=status.HTTP_404_NOT_FOUND)
+    if request.method == 'POST':
+        current_deploy = environment.current_deploy
+        if current_deploy and environment.status == Environment.SUCCESS:
+            if environment.name == 'Development':
+                staging = site.environments.filter(name='Staging').first()
+                staging.current_deploy = current_deploy
+                staging.status = environment.status
+                staging.save()
+                return Response(status=status.HTTP_201_CREATED)
+            elif environment.name == 'Staging':
+                prod = site.environments.filter(name='Production').first()
+                prod.current_deploy = current_deploy
+                prod.status = environment.status
+                prod.save()
+                return Response(status=status.HTTP_201_CREATED)
+        message = {
+            'error': '%s does not have a build to promote' % (environment.name)
+        }
+        return Response(message, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
 @permission_classes((GithubOnly, ))
 def github_webhook(request):
     """
