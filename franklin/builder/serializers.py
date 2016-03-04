@@ -1,7 +1,6 @@
 from rest_framework import serializers
 
-from builder.models import Build, BranchBuild, Environment, Owner, Site, \
-        TagBuild
+from builder.models import BranchBuild, Environment, Owner, Site, TagBuild
 
 
 class OwnerSerializer(serializers.ModelSerializer):
@@ -19,19 +18,28 @@ class OwnerSerializer(serializers.ModelSerializer):
 class BranchBuildSerializer(serializers.ModelSerializer):
     class Meta:
         model = BranchBuild
-        fields = ('branch', 'git_hash')
+        fields = ('branch', 'git_hash', 'created')
 
 
 class TagBuildSerializer(serializers.ModelSerializer):
     class Meta:
         model = TagBuild
-        fields = ('tag')
+        fields = ('tag', 'created')
 
 
 class EnvironmentSerializer(serializers.ModelSerializer):
+
+    def to_representation(self, data):
+        return {
+            'name': data.name,
+            'url': data.url,
+            'status': Environment.STATUS_CHOICES_DICT[data.status],
+            'deploy_type': Environment.DEPLOY_CHOICES_DICT[data.deploy_type]
+        }
+
     class Meta:
         model = Environment
-        fields = ('name', 'url', 'status')
+        fields = ('name', 'url', 'status', 'deploy_type')
         extra_kwargs = {
             "github_id": {
                 "validators": [],
@@ -39,41 +47,39 @@ class EnvironmentSerializer(serializers.ModelSerializer):
         }
 
 
-class EnvironmentDetailSerializer(serializers.ModelSerializer):
+class EnvironmentDetailSerializer(serializers.Serializer):
 
     def to_representation(self, data):
         current_deploy = data.current_deploy
+        deploy_type = data.deploy_type
         build_result = {}
-        if not current_deploy:
-            if self.context and self.context.get('user', None):
-                user = self.context['user']
-                branch, git_hash = data.site.get_newest_commit(user)
-                build_result = {
-                        'default_branch': branch,
-                        'git_hash': git_hash
-                }
-        elif hasattr(current_deploy, 'branchbuild'):
-            build = BranchBuild.objects.get(created=current_deploy.created)
-            serializer = BranchBuildSerializer(build)
-            build_result = serializer.data
-        elif hasattr(current_deploy, 'tagbuild'):
-            build = TagBuild.objects.get(created=current_deploy.created)
-            serializer = TagBuildSerializer(build)
-            build_result = serializer.data
-
+        default_branch_details = {}
         env_serializer = EnvironmentSerializer(data)
         result = env_serializer.data
-        result['current_deploy'] = build_result
-        return result
+        if deploy_type != Environment.PROMOTE:
+            if not current_deploy:
+                if self.context and self.context.get('user', None):
+                    user = self.context['user']
+                    branch, git_hash = data.site.get_newest_commit(user)
+                    default_branch_details = {
+                            'branch': branch,
+                            'git_hash': git_hash
+                    }
+            else:
+                if hasattr(current_deploy, 'branchbuild'):
+                    build = BranchBuild.objects.get(
+                                created=current_deploy.created)
+                    serializer = BranchBuildSerializer(build)
+                    build_result = serializer.data
+                elif hasattr(current_deploy, 'tagbuild'):
+                    build = TagBuild.objects.get(
+                                created=current_deploy.created)
+                    serializer = TagBuildSerializer(build)
+                    build_result = serializer.data
 
-    class Meta:
-        model = Environment
-        fields = ('name', 'url', 'status', 'current_deploy')
-        extra_kwargs = {
-            "github_id": {
-                "validators": [],
-            },
-        }
+        result['current_deploy'] = build_result
+        result['default_branch'] = default_branch_details
+        return result
 
 
 class EnvironmentStatusSerializer(serializers.ModelSerializer):
@@ -89,7 +95,7 @@ class SiteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Site
-        fields = ('name', 'github_id', 'owner', 'environments', 'is_active')
+        fields = ('name', 'github_id', 'owner', 'environments')
         # Not ideal, but you can't update existing models without disabling
         # validation for our unique=True github_id
         # This is a known issue in DRF:
@@ -123,7 +129,7 @@ class SiteOnlySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Site
-        fields = ('name', 'github_id', 'owner', 'is_active')
+        fields = ('name', 'github_id', 'owner')
 
 
 class FlatSiteSerializer(serializers.ModelSerializer):

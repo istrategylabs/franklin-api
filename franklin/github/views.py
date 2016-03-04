@@ -114,8 +114,8 @@ def repository_detail(request, pk):
 def delete_site(site, user):
     # TODO - This should be an async process that is thrown into a queue. The
     # site is no longer active, so the actual delete can occur lazily.
-    webhook_delete_response = delete_webhook(site, user)
-    if status.is_success(webhook_delete_response.status_code):
+    webhook_deleted = delete_webhook(site, user)
+    if webhook_deleted and status.is_success(webhook_deleted.status_code):
         deploy_key_delete_response = delete_deploy_key(site, user)
         if status.is_success(deploy_key_delete_response.status_code):
             site.delete()
