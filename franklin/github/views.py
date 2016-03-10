@@ -175,32 +175,30 @@ def manage_environments(request, repo):
     """
     Create or Delete an environment
     """
+    # TODO - This is going to get refactored to allow for the creation of any
+    # number of environments with any name, etc. Pipeline control will be the
+    # job of the dashboard, not the API.
     try:
         site = Site.objects.get(github_id=repo)
     except Site.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
     if request.method == 'POST':
-        environment = site.get_default_environment()
-        parent_name = environment.name
-        if parent_name == 'Production':
-            new_name = 'Staging'
-            new_url = new_name.lower() + '-' + environment.url
-        elif parent_name == 'Staging':
-            new_name = 'Development'
-            new_url = new_name.lower() + '-' + environment.url[8:]
+        env = site.get_default_environment()
+        if env.name == 'Production':
+            name = 'Staging'
+        elif env.name == 'Staging':
+            name = 'Development'
         else:
             message = {
                 'error': 'The maximum limit of 3 environments has been reached'
             }
             return Response(message, status=status.HTTP_400_BAD_REQUEST)
 
-        environment.pk = None  # Will be auto-generated, creating a new row
-        environment.name = new_name
-        environment.url = new_url
-        environment.save()
-
-        # Finally, update the parent environment to be promotion only
-        site.environments.filter(name=parent_name)\
+        new_environment = Environment(
+                site=site, name=name, branch=env.branch,
+                tag_regex=env.tag_regex, deploy_type=env.deploy_type)
+        new_environment.save()
+        site.environments.filter(name=env.name)\
                          .update(deploy_type=Environment.PROMOTE)
         return Response(status=status.HTTP_201_CREATED)
     elif request.method == 'DELETE':

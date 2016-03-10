@@ -33,11 +33,11 @@ Now with Github deploys!
       CORS_WHITELIST=<url_or_urls_making_frontend_calls>
       SENTRY_DSN=<url_sentry_dsn>
     ```
-- Projects you wish to be deployed by franklin will need a `.franklin` file in their root
+- Projects you wish to be deployed by franklin will need a `.franklin.yml` file in their root. Below is an example of the file contents with defaults that Franklin will use if you don't specify them.
 
   ```
-    TODO - add example build/deploy settings here.
-    Note - Environment configuration will likely be handled during the registration step. So not here.
+    build_path: '/public'
+    # Comment - Future support for settings like 'node_version' likely coming
   ```
 
 ### Viewing models at /admin

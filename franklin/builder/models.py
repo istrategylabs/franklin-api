@@ -179,32 +179,21 @@ class Environment(models.Model):
     TAG = 'TAG'
     PROMOTE = 'PRO'
     DEPLOY_CHOICES = (
-        (BRANCH, _('Any push to a branch')),
-        (TAG, _('Any commit matching a tag regex')),
-        (PROMOTE, _('Manually from a lower environment'))
+        (BRANCH, _('branch')),
+        (TAG, _('tag')),
+        (PROMOTE, _('promote'))
     )
-    DEPLOY_CHOICES_DICT = {
-        BRANCH: _('branch'),
-        TAG: _('tag'),
-        PROMOTE: _('promote')
-    }
 
     REGISTERED = 'REG'
     BUILDING = 'BLD'
     SUCCESS = 'SUC'
     FAILED = 'FAL'
     STATUS_CHOICES = (
-        (REGISTERED, _('Webhook Registered')),
-        (BUILDING, _('Building Now')),
-        (SUCCESS, _('Deploy Succeeded')),
-        (FAILED, _('Deploy Failed'))
+        (REGISTERED, _('registered')),
+        (BUILDING, _('building')),
+        (SUCCESS, _('success')),
+        (FAILED, _('failed'))
     )
-    STATUS_CHOICES_DICT = {
-        REGISTERED: _('registered'),
-        BUILDING: _('building'),
-        SUCCESS: _('success'),
-        FAILED: _('failed')
-    }
 
     site = models.ForeignKey(Site, related_name='environments')
     name = models.CharField(max_length=100, default='')
@@ -247,9 +236,9 @@ class Environment(models.Model):
                 self.status = self.FAILED
             else:
                 self.status = self.BUILDING
+            self.save()
         else:
             logger.error("Site already building...")
-            self.save()
 
     def can_build(self):
         return self.status is not self.BUILDING and self.current_deploy

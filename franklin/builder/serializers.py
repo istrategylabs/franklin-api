@@ -33,8 +33,8 @@ class EnvironmentSerializer(serializers.ModelSerializer):
         return {
             'name': data.name,
             'url': data.url,
-            'status': Environment.STATUS_CHOICES_DICT[data.status],
-            'deploy_type': Environment.DEPLOY_CHOICES_DICT[data.deploy_type]
+            'status': data.get_status_display(),
+            'deploy_type': data.get_deploy_type_display()
         }
 
     class Meta:
@@ -83,6 +83,11 @@ class EnvironmentDetailSerializer(serializers.Serializer):
 
 
 class EnvironmentStatusSerializer(serializers.ModelSerializer):
+
+    def to_representation(self, data):
+        return {
+            'status': data.get_status_display(),
+        }
 
     class Meta:
         model = Environment
