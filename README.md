@@ -4,6 +4,7 @@ Now with Github deploys!
 
 ![franklin](http://www.brand-licensing.com/DBImages/lizenzen/franklin-logo.jpg)
 
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://www.getpostman.com/run-collection/4f41ec773c7740573b1a)
 ## Installation
 
 1. Install [docker toolbox](https://www.docker.com/toolbox)
