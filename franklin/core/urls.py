@@ -12,7 +12,7 @@ urlpatterns = [
     url(r'^webhook/$', github_webhook, name='webhook'),
 
     # Registered Repo Operations
-    url(r'^repos/$', repository_list, name='repo_list'),
+    url(r'^projects/$', repository_list, name='repo_list'),
     url(r'^repos/(?P<pk>[0-9]+)$', repository_detail, name='repo_details'),
     url(r'^repos/(?P<pk>[0-9]+)/deploy$', deploy, name='repo_deploy'),
 

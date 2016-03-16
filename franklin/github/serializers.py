@@ -10,7 +10,7 @@ class HeadCommitSerializer(serializers.Serializer):
     id = serializers.CharField(min_length=40, max_length=40)
     # Also available
     # message, timestamp, url, author{}, committer{}, ...
-    
+
 
 class RepositorySerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=100)

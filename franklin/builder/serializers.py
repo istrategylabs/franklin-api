@@ -139,9 +139,12 @@ class SiteOnlySerializer(serializers.ModelSerializer):
 
 class FlatSiteSerializer(serializers.ModelSerializer):
     def to_representation(self, data):
-        env = data.get_default_environment()
+        build = BranchBuild.objects.filter(site=data)\
+                                   .order_by('-created').first()
         site_serializer = SiteOnlySerializer(data)
-        default_env_serializer = EnvironmentStatusSerializer(env)
         result = site_serializer.data
-        result['default_environment'] = default_env_serializer.data
+        result['build'] = {}
+        if build:
+            latest_build_serializer = BranchBuildSerializer(build)
+            result['build'] = latest_build_serializer.data
         return result

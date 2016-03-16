@@ -33,11 +33,7 @@ def repository_list(request):
             request.user.details.update_repos_for_user(github_repos)
         sites = request.user.details.sites.filter(is_active=True).all()
         site_serializer = FlatSiteSerializer(sites, many=True)
-        user_serializer = UserSerializer(request.user)
-        return Response({
-            'repos': site_serializer.data,
-            'user': user_serializer.data
-        }, status=status.HTTP_200_OK)
+        return Response(site_serializer.data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         # TODO - #53 will have us refactoring all errors returned from our
         # external dependencies. It will need to handle cases like this where
