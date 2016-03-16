@@ -85,9 +85,14 @@ class Site(models.Model):
         return self.environments.filter(~Q(deploy_type=Environment.PROMOTE))\
                                 .first()
 
-    def save(self, *args, **kwargs):
+    def save(self, user=None, *args, **kwargs):
         if not self.deploy_key:
             self.deploy_key, self.deploy_key_secret = generate_ssh_keys()
+        if not self.environments.exists() and user:
+            branch = get_default_branch(self, user)
+            self.environments.create(
+                    name=self.DEFAULT_ENV, deploy_type=Environment.PROMOTE)
+            self.environments.create(name='Staging', branch=branch)
         super(Site, self).save(*args, **kwargs)
 
     def __str__(self):

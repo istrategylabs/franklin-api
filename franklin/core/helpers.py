@@ -1,8 +1,5 @@
-import hmac
-import hashlib
 import json
 import logging
-import os
 import requests
 import sys
 
@@ -11,7 +8,7 @@ from django.core.urlresolvers import reverse
 from Crypto.PublicKey import RSA
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
-from rest_framework import status, permissions
+from rest_framework import status
 from rest_framework.authentication import BaseAuthentication,\
                                           get_authorization_header
 from social.apps.django_app.default.models import UserSocialAuth
@@ -62,21 +59,6 @@ def generate_ssh_keys():
     key = RSA.generate(2048)
     pubkey = key.publickey().exportKey('OpenSSH')
     return (pubkey.decode('UTF8'), key.exportKey('PEM').decode('UTF8'))
-
-
-class GithubOnly(permissions.BasePermission):
-    """ Security Check for certain API endpoints only called by Github."""
-
-    def has_permission(self, request, view):
-        secret = request.META.get("HTTP_X_HUB_SIGNATURE")
-        if secret:
-            # must convert to bytes for python 3.5 bug in hmac library
-            key = bytes(os.environ['GITHUB_SECRET'].encode('ascii'))
-            computed_secret = 'sha1=' + hmac.new(
-                    key, request.body, hashlib.sha1).hexdigest()
-            is_valid_github = hmac.compare_digest(computed_secret, secret)
-            return is_valid_github
-        return False
 
 
 class SocialAuthentication(BaseAuthentication):

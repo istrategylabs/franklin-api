@@ -3,8 +3,8 @@ from django.conf.urls import url
 from .views import health
 from builder.views import UpdateBuildStatus
 from github.views import deploy, deployable_repos, github_webhook, \
-        manage_environments, promote_environment, repository_detail, \
-        repository_list, get_auth_token
+        manage_environments, ProjectDetail, ProjectList, promote_environment, \
+        get_auth_token
 
 urlpatterns = [
     # Github Social Signin
@@ -12,11 +12,12 @@ urlpatterns = [
     url(r'^webhook/$', github_webhook, name='webhook'),
 
     # Registered Repo Operations
-    url(r'^projects/$', repository_list, name='repo_list'),
-    url(r'^repos/(?P<pk>[0-9]+)$', repository_detail, name='repo_details'),
+    url(r'^projects/$', ProjectList.as_view(), name='repo_list'),
+    url(r'^repos/(?P<pk>[0-9]+)$', ProjectDetail.as_view(), name='repo_details'),
     url(r'^repos/(?P<pk>[0-9]+)/deploy$', deploy, name='repo_deploy'),
 
-    url(r'^repos/all/$', deployable_repos, name='deployable_repos'),
+    # Github passthrough endpoints
+    url(r'^repos/$', deployable_repos, name='deployable_repos'),
 
     # Environment management
     url(r'repos/(?P<repo>[0-9]+)/environments$', manage_environments,

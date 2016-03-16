@@ -1,7 +1,7 @@
 import logging
 from rest_framework import serializers
 
-from builder.models import Site
+from builder.models import Owner, Site
 
 logger = logging.getLogger(__name__)
 
@@ -12,11 +12,34 @@ class HeadCommitSerializer(serializers.Serializer):
     # message, timestamp, url, author{}, committer{}, ...
 
 
+class OwnerSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    login = serializers.CharField()
+
+
 class RepositorySerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=100)
+    name = serializers.CharField(max_length=100)
     id = serializers.IntegerField()
+    owner = OwnerSerializer()
+    html_url = serializers.CharField()
     # Also available
-    # name, owner{}, html_url, fork, url, master_branch, ...
+    # name, html_url, fork, url, master_branch, ...
+
+    def create(self, validated_data):
+        owner_data = validated_data.pop('owner')
+        owner_id = owner_data.get('id', None)
+        repo_id = validated_data.get('id', None)
+        if owner_id and repo_id:
+            owner, o_created = Owner.objects.update_or_create(
+                    github_id=owner_id, defaults={'name': owner_data['login']})
+            if owner:
+                site, s_created = Site.objects.update_or_create(
+                        github_id=repo_id, owner=owner,
+                        defaults={'name': validated_data['name']})
+                if site:
+                    return site
+        return None
 
 
 class GithubWebhookSerializer(serializers.Serializer):

@@ -119,13 +119,57 @@ def get_access_token(request):
     return make_rest_post_call(url, headers, params)
 
 
-def get_default_branch(site, user):
-    url = build_repos_root_url(site.owner.name, site.name)
+def get_user_orgs(user):
+    url = 'https://api.github.com/user/orgs'
     headers = get_auth_header(user)
     result = make_rest_get_call(url, headers)
+    if status.is_success(result.status_code):
+        return result.json()
+    return None
+
+
+def get_all_repos(user):
+    url = 'https://api.github.com/user/repos?per_page=100'
+    headers = get_auth_header(user)
+    have_next_page = True
+    repos = []
+
+    while have_next_page:
+        result = None
+        have_next_page = False  # when in doubt, leave the loop after 1
+        result = make_rest_get_call(url, headers)
+        if status.is_success(result.status_code):
+            # Add all of the repos to our list
+            for repo in result.json():
+                repos.append(repo)
+
+            # If the header has a paging link called 'next', update our url
+            # and continue with the while loop
+            if result.links and result.links.get('next', None):
+                url = result.links['next']['url']
+                have_next_page = True
+    return repos
+
+
+def get_repo(owner, repo, user):
+    url = build_repos_root_url(owner, repo)
+    headers = get_auth_header(user)
+    return make_rest_get_call(url, headers)
+
+
+def get_default_branch(site, user):
+    result = get_repo(site.owner.name, site.name, user)
 
     if status.is_success(result.status_code):
         return result.json().get('default_branch', None)
+    return ''
+
+
+def get_repo_permissions(owner, repo, user):
+    result = get_repo(owner, repo, user)
+
+    if status.is_success(result.status_code):
+        return result.json().get('permissions', None)
     return ''
 
 

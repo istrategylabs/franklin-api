@@ -1,107 +1,97 @@
 import logging
 import os
 
+from django.http import Http404
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from .api import create_repo_deploy_key, create_repo_webhook, \
         delete_deploy_key, delete_webhook, get_access_token, \
-        get_default_branch, get_franklin_config
-from .serializers import GithubWebhookSerializer
-from builder.models import Site, Environment
+        get_all_repos, get_repo
+from .permissions import GithubOnly, UserIsProjectAdmin
+from .serializers import GithubWebhookSerializer, RepositorySerializer
+from builder.models import Environment, Site
 from builder.serializers import FlatSiteSerializer, SiteSerializer
-
-from core.helpers import GithubOnly, do_auth
+from core.helpers import do_auth
 from users.serializers import UserSerializer
 
 
 logger = logging.getLogger(__name__)
 
 
-@api_view(['GET', 'POST'])
-def repository_list(request):
+class ProjectList(APIView):
     """
     Get all repos currently deployed by Franklin that the user can manage or
     register a new repo
     """
-    if request.method == 'GET':
-        if request.user.details.sites.count() == 0:
-            github_repos = request.user.details.get_user_repos()
-            # TODO - return error from github
-            request.user.details.update_repos_for_user(github_repos)
-        sites = request.user.details.sites.filter(is_active=True).all()
+    permission_classes = (UserIsProjectAdmin,)
+
+    def get(self, request, format=None):
+        sites = request.user.details.get_user_repos()
         site_serializer = FlatSiteSerializer(sites, many=True)
         return Response(site_serializer.data, status=status.HTTP_200_OK)
-    elif request.method == 'POST':
-        # TODO - #53 will have us refactoring all errors returned from our
-        # external dependencies. It will need to handle cases like this where
-        # we get a potential non-error like this one.
-        serializer = SiteSerializer(data=request.data)
-        if serializer and serializer.is_valid():
-            try:
-                site = Site.objects.get(github_id=request.data['github_id'])
-                return Response('Resource already exists', status=422)
-            except Site.DoesNotExist:
-                pass  # Expected
-            site = serializer.save()
-            if not request.user.details.has_repo_access(site):
-                message = 'Current user does not have permission for this repo'
-                logger.warn(message + ' | %s | %s', request.user, site)
-                return Response(message, status=status.HTTP_403_FORBIDDEN)
 
-        retrieve_franklin_config_file(site, request.user)
+    def post(self, request, format=None):
+        project = request.data['github']
+        owner, repo = project.split('/')
+        if Site.objects.filter(name=repo, owner__name=owner).count() > 0:
+            return Response({'detail': 'Resource already exists'}, status=422)
 
-        # Call Github to register a webhook
-        webhook_r = create_repo_webhook(site, request.user)
-        if (status.is_success(webhook_r.status_code) or
-                webhook_r.status_code == 422):
-            site.webhook_id = webhook_r.json().get('id', '')
-            # Call Github to register a deploy key
-            deploy_key_r = create_repo_deploy_key(site, request.user)
-            if (status.is_success(deploy_key_r.status_code) or
-                    deploy_key_r.status_code == 422):
-                site.deploy_key_id = deploy_key_r.json().get('id', '')
-                site.save()
-                if not site.environments.exists():
-                    branch = get_default_branch(site, request.user)
-                    site.environments.create(name=site.DEFAULT_ENV,
-                                             branch=branch)
-                return Response(status=status.HTTP_201_CREATED)
-        delete_site(site, request.user)
-    return Response(status=status.HTTP_400_BAD_REQUEST)
+        test_owner = type("", (object,), {})()
+        test_owner.name = owner
+        test_site = type("", (object,), {})()
+        test_site.name = repo
+        test_site.owner = test_owner
+        self.check_object_permissions(request, test_site)
+
+        # New project, call github for the details
+        result = get_repo(owner, repo, request.user)
+        if status.is_success(result.status_code):
+            serializer = RepositorySerializer(data=result.json())
+            if serializer and serializer.is_valid():
+                site = serializer.save()
+
+                # Call Github to register a webhook
+                webhook_r = create_repo_webhook(site, request.user)
+                if (status.is_success(webhook_r.status_code) or
+                        webhook_r.status_code == 422):
+                    site.webhook_id = webhook_r.json().get('id', '')
+                    # Call Github to register a deploy key
+                    deploy_key_r = create_repo_deploy_key(site, request.user)
+                    if (status.is_success(deploy_key_r.status_code) or
+                            deploy_key_r.status_code == 422):
+                        site.deploy_key_id = deploy_key_r.json().get('id', '')
+                        site.save(user=request.user)
+                        return Response(status=status.HTTP_201_CREATED)
+                delete_site(site, request.user)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
-def retrieve_franklin_config_file(site, user):
-    # Call Github for franklin config
-    config = get_franklin_config(site, user)
-    if config and not hasattr(config, 'status_code'):
-        # Optional. Update DB with any relevant .franklin config
-        pass
-
-
-@api_view(['GET', 'DELETE'])
-def repository_detail(request, pk):
+class ProjectDetail(APIView):
     """
     Rerieve or Delete a Github project with franklin
     """
-    try:
-        site = Site.objects.get(github_id=pk)
-    except Site.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-    if not request.user.details.has_repo_access(site):
-        message = 'Current user does not have permission for this repo'
-        logger.warn(message + ' | %s | %s', request.user, site)
-        return Response(message, status=status.HTTP_403_FORBIDDEN)
-    if request.method == 'GET':
+    permission_classes = (UserIsProjectAdmin,)
+
+    def get_object(self, pk):
+        try:
+            return Site.objects.get(github_id=pk)
+        except Site.DoesNotExist:
+            raise Http404
+
+    def get(self, request, pk, format=None):
+        site = self.get_object(pk)
         site_serializer = SiteSerializer(site, context={'user': request.user})
-        user_serializer = UserSerializer(request.user)
-        return Response({
-            'repo': site_serializer.data,
-            'user': user_serializer.data
-        }, status=status.HTTP_200_OK)
-    elif request.method == 'DELETE':
+        return Response(site_serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk, format=None):
+        site = self.get_object(pk)
+        # Before proceeding, check that user is allowed
+        self.check_object_permissions(request, site)
         site.is_active = False
         site.save()
         return delete_site(site, request.user)
@@ -128,21 +118,9 @@ def deployable_repos(request):
     All repos from Github that the user has the permission level to deploy
     """
     if request.method == 'GET':
-        # TODO - in the model, github response should map to a serializer which
-        # we should use here to define the respone type
-        github_repos = request.user.details.get_user_repos()
-        # TODO - return error from github
-
-        # While we are here, might as well update linkages between the user and
-        # all active repos managed by Franklin
-        request.user.details.update_repos_for_user(github_repos)
-
-        # build response
-        serializer = UserSerializer(request.user)
-        return Response({
-            'repos': github_repos,
-            'user': serializer.data
-        }, status=status.HTTP_200_OK)
+        github_repos = get_all_repos(request.user)
+        serializer = RepositorySerializer(github_repos, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
