@@ -66,7 +66,10 @@ class ProjectList(APIView):
                             deploy_key_r.status_code == 422):
                         site.deploy_key_id = deploy_key_r.json().get('id', '')
                         site.save(user=request.user)
-                        return Response(status=status.HTTP_201_CREATED)
+                        site_serializer = SiteSerializer(
+                                site, context={'user': request.user})
+                        return Response(site_serializer.data,
+                                        status=status.HTTP_201_CREATED)
                 delete_site(site, request.user)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 

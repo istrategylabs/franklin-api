@@ -85,6 +85,10 @@ class Site(models.Model):
         return self.environments.filter(~Q(deploy_type=Environment.PROMOTE))\
                                 .first()
 
+    def get_most_recent_build(self):
+        return BranchBuild.objects.filter(site=self)\
+                                  .order_by('-created').first()
+
     def save(self, user=None, *args, **kwargs):
         if not self.deploy_key:
             self.deploy_key, self.deploy_key_secret = generate_ssh_keys()

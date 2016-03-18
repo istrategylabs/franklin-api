@@ -12,8 +12,9 @@ urlpatterns = [
     url(r'^webhook/$', github_webhook, name='webhook'),
 
     # Registered Repo Operations
-    url(r'^projects/$', ProjectList.as_view(), name='repo_list'),
-    url(r'^repos/(?P<pk>[0-9]+)$', ProjectDetail.as_view(), name='repo_details'),
+    url(r'^projects/$', ProjectList.as_view(), name='project_list'),
+    url(r'^projects/(?P<pk>[0-9]+)$',
+        ProjectDetail.as_view(), name='project_details'),
     url(r'^repos/(?P<pk>[0-9]+)/deploy$', deploy, name='repo_deploy'),
 
     # Github passthrough endpoints

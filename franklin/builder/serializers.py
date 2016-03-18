@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from builder.models import BranchBuild, Environment, Owner, Site, TagBuild
+from builder.models import BranchBuild, Environment, Owner, Site
 
 
 class OwnerSerializer(serializers.ModelSerializer):
@@ -21,25 +21,11 @@ class BranchBuildSerializer(serializers.ModelSerializer):
         fields = ('branch', 'git_hash', 'created')
 
 
-class TagBuildSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TagBuild
-        fields = ('tag', 'created')
-
-
 class EnvironmentSerializer(serializers.ModelSerializer):
-
-    def to_representation(self, data):
-        return {
-            'name': data.name,
-            'url': data.url,
-            'status': data.get_status_display(),
-            'deploy_type': data.get_deploy_type_display()
-        }
 
     class Meta:
         model = Environment
-        fields = ('name', 'url', 'status', 'deploy_type')
+        fields = ('name', 'url')
         extra_kwargs = {
             "github_id": {
                 "validators": [],
@@ -50,44 +36,21 @@ class EnvironmentSerializer(serializers.ModelSerializer):
 class EnvironmentDetailSerializer(serializers.Serializer):
 
     def to_representation(self, data):
-        current_deploy = data.current_deploy
-        deploy_type = data.deploy_type
-        build_result = {}
-        default_branch_details = {}
         env_serializer = EnvironmentSerializer(data)
         result = env_serializer.data
-        if deploy_type != Environment.PROMOTE:
-            if not current_deploy:
-                if self.context and self.context.get('user', None):
-                    user = self.context['user']
-                    branch, git_hash = data.site.get_newest_commit(user)
-                    default_branch_details = {
-                            'branch': branch,
-                            'git_hash': git_hash
-                    }
-            else:
-                if hasattr(current_deploy, 'branchbuild'):
-                    build = BranchBuild.objects.get(
-                                created=current_deploy.created)
-                    serializer = BranchBuildSerializer(build)
-                    build_result = serializer.data
-                elif hasattr(current_deploy, 'tagbuild'):
-                    build = TagBuild.objects.get(
-                                created=current_deploy.created)
-                    serializer = TagBuildSerializer(build)
-                    build_result = serializer.data
-
-        result['current_deploy'] = build_result
-        result['default_branch'] = default_branch_details
+        current_deploy = data.current_deploy
+        result['build'] = {}
+        if current_deploy and hasattr(current_deploy, 'branchbuild'):
+            build = BranchBuild.objects.get(created=current_deploy.created)
+            serializer = BranchBuildSerializer(build)
+            result['build'] = serializer.data
         return result
 
 
 class EnvironmentStatusSerializer(serializers.ModelSerializer):
 
-    def to_representation(self, data):
-        return {
-            'status': data.get_status_display(),
-        }
+    def to_representation(self, instance):
+        return {'status': instance.get_status_display(), }
 
     class Meta:
         model = Environment
@@ -97,6 +60,18 @@ class EnvironmentStatusSerializer(serializers.ModelSerializer):
 class SiteSerializer(serializers.ModelSerializer):
     owner = OwnerSerializer()
     environments = EnvironmentDetailSerializer(many=True, required=False)
+
+    def to_representation(self, instance):
+        result = super(SiteSerializer, self).to_representation(instance)
+        if self.context and self.context.get('user', None):
+            user = self.context['user']
+            branch, git_hash = instance.get_newest_commit(user)
+            result['default_branch'] = branch
+        build = instance.get_most_recent_build()
+        if build:
+            latest_build_serializer = BranchBuildSerializer(build)
+        result['build'] = latest_build_serializer.data if build else {}
+        return result
 
     class Meta:
         model = Site
@@ -139,12 +114,10 @@ class SiteOnlySerializer(serializers.ModelSerializer):
 
 class FlatSiteSerializer(serializers.ModelSerializer):
     def to_representation(self, data):
-        build = BranchBuild.objects.filter(site=data)\
-                                   .order_by('-created').first()
         site_serializer = SiteOnlySerializer(data)
         result = site_serializer.data
-        result['build'] = {}
+        build = data.get_most_recent_build()
         if build:
             latest_build_serializer = BranchBuildSerializer(build)
-            result['build'] = latest_build_serializer.data
+        result['build'] = latest_build_serializer.data if build else {}
         return result
