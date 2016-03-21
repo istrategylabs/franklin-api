@@ -4,6 +4,7 @@ from .views import health
 from builder.views import UpdateBuildStatus
 from github.views import builds, deployable_repos, github_webhook, \
         ProjectDetail, ProjectList, promote_environment, get_auth_token
+from users.views import user_details
 
 urlpatterns = [
     # Github Social Signin
@@ -24,6 +25,9 @@ urlpatterns = [
     # Build promotion
     url(r'repos/(?P<repo>[0-9]+)/environments/(?P<env>[a-zA-Z]+)/promote$',
         promote_environment, name='promote_environment'),
+
+    # User specific endpoints
+    url(r'^user/$', user_details, name='user_details'),
 
     # Private endpoints for Builder
     url(r'^build/(?P<pk>\d+)/update/$', UpdateBuildStatus.as_view(),
