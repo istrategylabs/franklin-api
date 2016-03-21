@@ -13,8 +13,8 @@ class HeadCommitSerializer(serializers.Serializer):
 
 
 class OwnerSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    login = serializers.CharField()
+    name = serializers.CharField()
+    email = serializers.CharField()
 
 
 class RepositorySerializer(serializers.Serializer):
@@ -46,7 +46,6 @@ class GithubWebhookSerializer(serializers.Serializer):
     head_commit = HeadCommitSerializer()
     repository = RepositorySerializer()
     ref = serializers.CharField(max_length=100)
-    ref_type = serializers.CharField(max_length=100, required=False)
 
     def get_existing_site(self):
         if self.is_valid():
@@ -58,10 +57,8 @@ class GithubWebhookSerializer(serializers.Serializer):
         return None
 
     def is_tag_event(self):
-        if self.validated_data:
-            ref_type = self.validated_data.get('ref_type', None)
-            if ref_type and ref_type == 'tag':
-                return True
+        # We stopped supporting tag builds and github changed their api, so
+        # just returning False for now.
         return False
 
     def get_event_hash(self):
