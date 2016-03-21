@@ -1,6 +1,7 @@
 import os
 from unittest import mock
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 
 from .models import BranchBuild, Environment, Owner, Site, TagBuild
@@ -17,16 +18,33 @@ class OwnerTestCase(TestCase):
 
 
 class SiteTestCase(TestCase):
-    def setUp(self):
+    @mock.patch('core.helpers.requests.get')
+    def setUp(self, mock_get):
+        # mocking the return object from POSTing to github API
+        mock_get_response = mock.Mock(status_code=200)
+        mock_get_response.json.return_value = {"default_branch": "master"}
+        mock_get.return_value = mock_get_response
+
+        self.user = User.objects.create_user(username="testuser", password="a")
+        social = self.user.social_auth.create(provider='github')
+        social.extra_data['access_token'] = ''
+        social.save()
+
         self.owner = Owner.objects.create(
             name='istrategylabs', github_id=607333)
         self.site = Site.objects.create(
             owner=self.owner, name='franklin-dashboard', github_id=45864453)
-        self.env = self.site.environments.get(name=self.site.DEFAULT_ENV)
+
+        self.site.save(user=self.user)
+        self.env = self.site.environments.get(name='Staging')
         self.git_message = dict([('ref', 'refs/heads/master'),
                                 ('head_commit', dict([('id', '80d25a09bc1ceb7d6707048211745dcc01bc8705')])),
                                 ('repository', dict([('id', '36470460'),
-                                                    ('full_name', 'istrategylabs/franklin-dashboard')]))])
+                                                     ('full_name', 'istrategylabs/franklin-dashboard'),
+                                                     ('owner', dict([('id', '234234123'),
+                                                                     ('login', 'istrategylabs')])),
+                                                     ('html_url', 'http://github.com/istrategylabs/franklin-dashboard'),
+                                                     ('name', 'franklin-dashboard')]))])
 
     def test_has_default_env(self):
         """ All sites should start with a production environment on creation
@@ -90,11 +108,23 @@ class SiteTestCase(TestCase):
 
 
 class EnvironmentTestCase(TestCase):
-    def setUp(self):
+    @mock.patch('core.helpers.requests.get')
+    def setUp(self, mock_get):
+        # mocking the return object from POSTing to github API
+        mock_get_response = mock.Mock(status_code=200)
+        mock_get_response.json.return_value = {"default_branch": "master"}
+        mock_get.return_value = mock_get_response
+
+        self.user = User.objects.create_user(username="testuser", password="a")
+        social = self.user.social_auth.create(provider='github')
+        social.extra_data['access_token'] = ''
+        social.save()
+
         self.owner = Owner.objects.create(
             name='istrategylabs', github_id=607333)
         self.site = Site.objects.create(
             owner=self.owner, name='FrAnKlIn-DaShBoArD', github_id=45864453)
+        self.site.save(user=self.user)
         self.env = self.site.environments.get(name=self.site.DEFAULT_ENV)
         self.branch_build = BranchBuild.objects.create(
             git_hash='asdf1234', branch=self.env.branch, site=self.site)
@@ -117,11 +147,11 @@ class EnvironmentTestCase(TestCase):
     def test_env_url(self):
         """ Environment should have a URL on save.
         """
-        staging = Environment.objects.create(name='Staging', site=self.site)
+        new_env = Environment.objects.create(name='Bleh', site=self.site)
         expected = "{name}-{env}.{base_domain}".format(
-            name=self.site.name.lower(), env=staging.name.lower(),
+            name=self.site.name.lower(), env=new_env.name.lower(),
             base_domain=os.environ['BASE_URL'])
-        self.assertEqual(staging.url, expected)
+        self.assertEqual(new_env.url, expected)
 
     def test_default_env_status(self):
         """ All environments start with a status of registered on creation
@@ -164,12 +194,25 @@ class EnvironmentTestCase(TestCase):
 
 
 class BuildTestCase(TestCase):
-    def setUp(self):
+
+    @mock.patch('core.helpers.requests.get')
+    def setUp(self, mock_get):
+        # mocking the return object from POSTing to github API
+        mock_get_response = mock.Mock(status_code=200)
+        mock_get_response.json.return_value = {"default_branch": "master"}
+        mock_get.return_value = mock_get_response
+
+        self.user = User.objects.create_user(username="testuser", password="a")
+        social = self.user.social_auth.create(provider='github')
+        social.extra_data['access_token'] = ''
+        social.save()
+
         self.owner = Owner.objects.create(
             name='istrategylabs', github_id=607333)
-        self.site = Site.objects.create(
-            owner=self.owner, name='franklin-dashboard', github_id=45864453)
-        self.env = self.site.environments.get(name=self.site.DEFAULT_ENV)
+        self.site = Site.objects.create(owner=self.owner, name='franklin-dashboard',
+                                   github_id=45864453)
+        self.site.save(user=self.user)
+        self.env = self.site.environments.filter(name=self.site.DEFAULT_ENV).first()
         self.tag_build = TagBuild.objects.create(tag='v1.0.2', site=self.site)
         self.branch_build = BranchBuild.objects.create(
             git_hash='asdf1234', branch='master', site=self.site)

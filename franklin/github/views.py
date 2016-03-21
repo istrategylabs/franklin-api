@@ -150,59 +150,6 @@ def builds(request, pk):
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['POST', 'DELETE'])
-def manage_environments(request, repo):
-    """
-    Create or Delete an environment
-    """
-    # TODO - This is going to get refactored to allow for the creation of any
-    # number of environments with any name, etc. Pipeline control will be the
-    # job of the dashboard, not the API.
-    try:
-        site = Site.objects.get(github_id=repo)
-    except Site.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-    if request.method == 'POST':
-        env = site.get_default_environment()
-        if env.name == 'Production':
-            name = 'Staging'
-        elif env.name == 'Staging':
-            name = 'Development'
-        else:
-            message = {
-                'error': 'The maximum limit of 3 environments has been reached'
-            }
-            return Response(message, status=status.HTTP_400_BAD_REQUEST)
-
-        new_environment = Environment(
-                site=site, name=name, branch=env.branch,
-                tag_regex=env.tag_regex, deploy_type=env.deploy_type)
-        new_environment.save()
-        site.environments.filter(name=env.name)\
-                         .update(deploy_type=Environment.PROMOTE)
-        return Response(status=status.HTTP_201_CREATED)
-    elif request.method == 'DELETE':
-        default_env = site.get_default_environment()
-        if default_env.name == 'Development':
-            # Staging will be the new base environment
-            staging = site.environments.filter(name='Staging').first()
-            staging.deploy_type = default_env.deploy_type
-            staging.save()
-            default_env.delete()
-        elif default_env.name == 'Staging':
-            # Pro will be the new base environment
-            prod = site.environments.filter(name='Production').first()
-            prod.deploy_type = default_env.deploy_type
-            prod.save()
-            default_env.delete()
-        else:
-            message = {
-                'error': 'You must have at least one environment'
-            }
-            return Response(message, status=status.HTTP_400_BAD_REQUEST)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 @api_view(['POST'])
 def promote_environment(request, repo, env):
     """
