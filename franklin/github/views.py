@@ -10,12 +10,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from .api import create_repo_deploy_key, create_repo_webhook, \
-        delete_deploy_key, delete_webhook, get_access_token, \
-        get_all_repos, get_repo
+    delete_deploy_key, delete_webhook, get_access_token, get_all_repos, \
+    get_repo
 from .permissions import GithubOnly, UserIsProjectAdmin
 from .serializers import GithubWebhookSerializer, RepositorySerializer
-from builder.models import Environment, Site
-from builder.serializers import FlatSiteSerializer, SiteSerializer
+from builder.models import BranchBuild, Environment, Site
+from builder.serializers import BranchBuildSerializer, FlatSiteSerializer, \
+    SiteSerializer
 from core.helpers import do_auth
 from users.serializers import UserSerializer
 
@@ -126,21 +127,23 @@ def deployable_repos(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@api_view(['POST'])
-def deploy(request, pk):
+@api_view(['GET', 'POST'])
+def builds(request, pk):
     """
-    Attempt to build and deploy a site given a branch/hash
+    Deploy the tip of the default branch for the project or return all builds
+    that exist for the project
     """
     try:
         site = Site.objects.get(github_id=pk)
     except Site.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    # TODO - There is a check above for "user has permissions". We should
-    # convert that to a mixin. We migth be able to do that with this
-    # try/catch as well.
-    if request.method == 'POST':
-        branch = request.data.get('branch', None)
-        git_hash = request.data.get('git_hash', None)
+    if request.method == 'GET':
+        builds = BranchBuild.objects.filter(site=site).all()
+        serializer = BranchBuildSerializer(builds, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        branch, git_hash = site.get_newest_commit(request.user)
         if branch and git_hash:
             deploy_site(site, branch, git_hash)
             return Response(status=status.HTTP_201_CREATED)
