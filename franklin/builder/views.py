@@ -1,26 +1,38 @@
 import logging
-from rest_framework.permissions import AllowAny
+
 from rest_framework import status
+from rest_framework.exceptions import NotFound, ParseError
+from rest_framework.permissions import AllowAny
+from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from rest_framework import generics
-from .models import Environment
-# Create your views here.
-
-from .serializers import EnvironmentStatusSerializer
+from .models import Build, BranchBuild, Deploy, Environment, Site
 
 logger = logging.getLogger(__name__)
 
 
-class UpdateBuildStatus(generics.UpdateAPIView):
-    queryset = Environment.objects.all()
-    serializer_class = EnvironmentStatusSerializer
+class UpdateBuildStatus(APIView):
     permission_classes = (AllowAny,)
 
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
+    def get_object(self, request, git_hash):
+        try:
+            received_env = request.data.get('environment', '')
+            received_status = request.data.get('status', '')
+            if received_status not in ['success', 'failed']:
+                raise ParseError(detail="status must be 'success' or 'failed'")
+            build = BranchBuild.objects.get(git_hash=git_hash)
+            environment = Environment.objects.get(name__iexact=received_env,
+                                                  site=build.site)
+            return (environment, build)
+        except (BranchBuild.DoesNotExist, Environment.DoesNotExist,
+                Site.DoesNotExist) as e:
+            raise NotFound(detail=e)
 
-        return Response({'message': 'status updated', }, status.HTTP_200_OK)
+    def post(self, request, git_hash, format=None):
+        environment, build = self.get_object(request, git_hash)
+        received = request.data['status']
+        build.status = Build.SUCCESS if received == 'success' else Build.FAILED
+        build.save()
+        if build.status == Build.SUCCESS:
+            Deploy.objects.create(build=build, environment=environment)
+        return Response(status=status.HTTP_200_OK)

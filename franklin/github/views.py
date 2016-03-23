@@ -1,10 +1,12 @@
 import logging
 import os
+import sys
 
 from django.http import Http404
 
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,10 +16,10 @@ from .api import create_repo_deploy_key, create_repo_webhook, \
     get_repo
 from .permissions import GithubOnly, UserIsProjectAdmin
 from .serializers import GithubWebhookSerializer, RepositorySerializer
-from builder.models import BranchBuild, Environment, Site
+from builder.models import Build, BranchBuild, Deploy, Environment, Site
 from builder.serializers import BranchBuildSerializer, FlatSiteSerializer, \
     SiteSerializer
-from core.helpers import do_auth
+from core.helpers import do_auth, validate_request_payload
 from users.serializers import UserSerializer
 
 
@@ -36,6 +38,7 @@ class ProjectList(APIView):
         site_serializer = FlatSiteSerializer(sites, many=True)
         return Response(site_serializer.data, status=status.HTTP_200_OK)
 
+    @validate_request_payload(['github', ])
     def post(self, request, format=None):
         project = request.data['github']
         owner, repo = project.split('/')
@@ -137,47 +140,60 @@ def builds(request, pk):
         site = Site.objects.get(github_id=pk)
     except Site.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
+
     if request.method == 'GET':
         builds = BranchBuild.objects.filter(site=site).all()
         serializer = BranchBuildSerializer(builds, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
     elif request.method == 'POST':
-        branch, git_hash = site.get_newest_commit(request.user)
-        if branch and git_hash:
-            deploy_site(site, branch, git_hash)
-            return Response(status=status.HTTP_201_CREATED)
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        try:
+            branch, git_hash = site.get_newest_commit(request.user)
+            environment = site.environments.filter(name='Staging').first()
+            build, created = BranchBuild.objects.get_or_create(
+                git_hash=git_hash, branch=branch, site=site)
+            build.deploy(environment)
+            serializer = BranchBuildSerializer(build)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except:
+            logger.warning("Failed project tip deploy - %s", sys.exc_info()[0])
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['POST'])
-def promote_environment(request, repo, env):
+class PromoteEnvironment(APIView):
     """
-    Promote an environment to a higher environment
+    Promote a build to a higher environment
     """
-    try:
-        site = Site.objects.get(github_id=repo)
-        environment = Environment.objects.get(name__iexact=env, site=site)
-    except (Site.DoesNotExist, Environment.DoesNotExist) as e:
-        return Response(str(e), status=status.HTTP_404_NOT_FOUND)
-    if request.method == 'POST':
-        current_deploy = environment.current_deploy
-        if current_deploy and environment.status == Environment.SUCCESS:
-            if environment.name == 'Development':
-                staging = site.environments.filter(name='Staging').first()
-                staging.current_deploy = current_deploy
-                staging.status = environment.status
-                staging.save()
+    def get_object(self, request, repo, env):
+        try:
+            site = Site.objects.get(github_id=repo)
+            environment = Environment.objects.get(name__iexact=env, site=site)
+            git_hash = request.data['git_hash']
+            build = BranchBuild.objects.get(git_hash=git_hash)
+            return (environment, build)
+        except (BranchBuild.DoesNotExist, Environment.DoesNotExist,
+                Site.DoesNotExist) as e:
+            raise NotFound(detail=e)
+
+    @validate_request_payload(['git_hash', ])
+    def post(self, request, repo, env, format=None):
+        environment, build = self.get_object(request, repo, env)
+        current_deploy = environment.get_current_deploy()
+        message = {}
+        if current_deploy and build.id == current_deploy.id:
+            message = {'detail': 'already deployed'}
+        elif environment.name == 'Production':
+            if build.status == Build.SUCCESS and build.environments.exists():
+                Deploy.objects.create(build=build, environment=environment)
                 return Response(status=status.HTTP_201_CREATED)
-            elif environment.name == 'Staging':
-                prod = site.environments.filter(name='Production').first()
-                prod.current_deploy = current_deploy
-                prod.status = environment.status
-                prod.save()
+            message = {'detail': 'build is not suitable for promotion'}
+        else:
+            # Must be staging
+            if build.status == Build.SUCCESS and build.environments.exists():
+                Deploy.objects.create(build=build, environment=environment)
                 return Response(status=status.HTTP_201_CREATED)
-        message = {
-            'error': '%s does not have a build to promote' % (environment.name)
-        }
+            elif build.status == Build.FAILED:
+                build.deploy(environment)
+                return Response(status=status.HTTP_201_CREATED)
         return Response(message, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -193,24 +209,16 @@ def github_webhook(request):
             if event_type in ['push', 'create']:
                 github_event = GithubWebhookSerializer(data=request.data)
                 if github_event and github_event.is_valid():
-                    site = github_event.get_existing_site()
-                    if site:
-                        event = github_event.get_change_location()
-                        git_hash = github_event.get_event_hash()
-                        is_tag_event = github_event.is_tag_event()
-                        deploy_site(site, event, git_hash, is_tag_event)
-                        return Response(status=status.HTTP_201_CREATED)
+                    github_event.attempt_deployment()
+                    return Response(status=status.HTTP_201_CREATED)
                 else:
                     logger.warning("Received invalid Github Webhook message")
                 # Likely a webhook we don't build for.
                 return Response(status=status.HTTP_200_OK)
             elif event_type == 'ping':
-                # TODO - update the DB with some important info here
-                # repository{
-                #           id, name,
-                #           owner{ id, login },
-                #           sender{ id, login, site_admin }
-                #           }
+                # We COULD update the DB with some important info here
+                # repository{ id, name, owner{ id, login },
+                #             sender{ id, login, site_admin }}
                 return Response(status=status.HTTP_204_NO_CONTENT)
         else:
             logger.warning("Received a malformed POST message")
@@ -218,16 +226,6 @@ def github_webhook(request):
         # Invalid methods are caught at a higher level
         pass
     return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
-def deploy_site(site, event, git_hash, is_tag_event=False):
-    environment = site.get_deployable_event(event, git_hash, is_tag_event)
-    if environment:
-        # TODO - It's high time we actually mock this??
-        # This line helps with testing.
-        # We will remove once we add mocking.
-        if os.environ['ENV'] is not 'test':
-            environment.build()
 
 
 @api_view(['GET', 'POST'])

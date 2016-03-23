@@ -84,7 +84,8 @@ def create_repo_webhook(site, user):
                 'events': ['push'],
                 'active': True,
                 'config': {
-                    'url': os.environ['API_BASE_URL'] + reverse('webhook'),
+                    'url': os.environ['API_BASE_URL'] + \
+                        reverse('webhook:github'),
                     'content_type': 'json',
                     'secret': os.environ['GITHUB_SECRET']
                 }

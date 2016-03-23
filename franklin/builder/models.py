@@ -2,8 +2,8 @@ import logging
 import os
 import re
 
+from django.core.urlresolvers import reverse
 from django.db import models
-from django.db.models import Q
 from django.utils.translation import ugettext as _
 
 from rest_framework import status
@@ -54,22 +54,14 @@ class Site(models.Model):
     webhook_id = models.CharField(blank=True, null=True, max_length=12)
     is_active = models.BooleanField(default=True)
 
-    def get_deployable_event(self, event, git_hash, is_tag_event=False):
+    def get_deployable_environment(self, event, git_hash, is_tag_event=False):
         if self.is_active:
-            build = None
             for env in self.environments.all():
                 if (env.deploy_type == Environment.BRANCH and not
                         is_tag_event and event.endswith(env.branch)):
-                    build, created = BranchBuild.objects.get_or_create(
-                        git_hash=git_hash, branch=env.branch, site=self)
+                    return env
                 elif (env.deploy_type == Environment.TAG and
                         is_tag_event and re.match(env.tag_regex, event)):
-                    build, created = TagBuild.objects.get_or_create(
-                        tag=event, site=self)
-
-                if build:
-                    env.current_deploy = build
-                    env.save()
                     return env
         return None
 
@@ -80,10 +72,6 @@ class Site(models.Model):
         branch = get_default_branch(self, user)
         git_hash = get_branch_details(self, user, branch)
         return (branch, git_hash)
-
-    def get_default_environment(self):
-        return self.environments.filter(~Q(deploy_type=Environment.PROMOTE))\
-                                .first()
 
     def get_most_recent_build(self):
         return BranchBuild.objects.filter(site=self)\
@@ -114,15 +102,63 @@ class Build(models.Model):
     :param site: Reference to the project for this build instance
     :param git_hash: If a branch build, the git hash of the deployed code
     :param created: Date this code was built
+    :param deployed: Date this code was last deployed to an environment
     :param path: The path of the site on the static server
     """
+
+    NEW = 'NEW'
+    BUILDING = 'BLD'
+    SUCCESS = 'SUC'
+    FAILED = 'FAL'
+    STATUS_CHOICES = (
+        (NEW, _('new')),
+        (BUILDING, _('building')),
+        (SUCCESS, _('success')),
+        (FAILED, _('failed'))
+    )
 
     site = models.ForeignKey(Site, related_name='builds')
     created = models.DateTimeField(auto_now_add=True, editable=False)
     path = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=3, choices=STATUS_CHOICES,
+                              default=NEW)
 
     def get_path(self, site, name):
         return "{0}/{1}".format(site, name)
+
+    def can_build(self):
+        return self.status is not self.BUILDING
+
+    def deploy(self, environment):
+        if self.can_build():
+            callback = os.environ['API_BASE_URL'] + \
+                reverse('webhook:builder', args=[self.git_hash, ])
+
+            url = os.environ['BUILDER_URL'] + '/build'
+            headers = {'content-type': 'application/json'}
+            body = {
+                "deploy_key": self.site.deploy_key_secret,
+                "branch": self.branch,
+                "git_hash": self.git_hash,
+                "repo_owner": self.site.owner.name,
+                "path": self.path,
+                "repo_name": self.site.name,
+                "environment": environment.name.lower(),
+                'callback': callback
+            }
+            response = make_rest_post_call(url, headers, body)
+            if not status.is_success(response.status_code):
+                logger.error("Negative response from Builder: %s",
+                             response.status_code)
+                self.status = self.FAILED
+            else:
+                self.status = self.BUILDING
+            self.save()
+        else:
+            logger.error("Build being/been built by builder...")
+
+    def __str__(self):
+        return '%s - %s' % (self.status, self.created)
 
 
 class TagBuild(Build):
@@ -172,14 +208,12 @@ class Environment(models.Model):
 
     :param site: Ref to the project this environment is hosting
     :param name: Name for the environment.
-    :param description: Optional detailed information about the environment
     :param deploy_type: What event will trigger a build. (push to branch,
                         tagging a commit, or manually by an admin user)
     :param branch: Code branch that is used for deploying
     :param tag_regex: Tag events matching this regular expression will be
                       deployed (If deploy_type is tag)
     :param url: The url builder has deployed this project to
-    :param current_deployed: Ref to the current build of code
     :param past_builds: Ref to all builds that can be marked current_deployed
     :param status: The current status of the deployed version on Franklin
     """
@@ -193,64 +227,19 @@ class Environment(models.Model):
         (PROMOTE, _('promote'))
     )
 
-    REGISTERED = 'REG'
-    BUILDING = 'BLD'
-    SUCCESS = 'SUC'
-    FAILED = 'FAL'
-    STATUS_CHOICES = (
-        (REGISTERED, _('registered')),
-        (BUILDING, _('building')),
-        (SUCCESS, _('success')),
-        (FAILED, _('failed'))
-    )
-
     site = models.ForeignKey(Site, related_name='environments')
     name = models.CharField(max_length=100, default='')
-    description = models.TextField(max_length=20480, default='', blank=True)
     deploy_type = models.CharField(
         max_length=3, choices=DEPLOY_CHOICES, default=BRANCH)
     branch = models.CharField(max_length=100, default='master')
     tag_regex = models.CharField(max_length=100, blank=True)
     url = models.CharField(max_length=100, unique=True)
-    current_deploy = models.ForeignKey(
-        Build, related_name='deployments', null=True, blank=True)
     past_builds = models.ManyToManyField(
-        Build, related_name='environments', blank=True)
-    status = models.CharField(
-        max_length=3, choices=STATUS_CHOICES, default=REGISTERED)
+        Build, related_name='environments', through='Deploy', blank=True)
 
-    def build(self):
-        if self.can_build():
-            is_tag_build = hasattr(self.current_deploy, 'tagbuild')
-            branch = self.current_deploy.branch if not is_tag_build else ''
-            tag = self.current_deploy.tag if is_tag_build else ''
-            git_hash = self.current_deploy.git_hash if not is_tag_build else ''
-
-            url = os.environ['BUILDER_URL'] + '/build'
-            headers = {'content-type': 'application/json'}
-            body = {
-                "deploy_key": self.site.deploy_key_secret,
-                "branch": branch,
-                "tag": tag,
-                "git_hash": git_hash,
-                "repo_owner": self.site.owner.name,
-                "path": self.current_deploy.path,
-                "repo_name": self.site.name,
-                "environment_id": self.id
-                }
-            response = make_rest_post_call(url, headers, body)
-            if not status.is_success(response.status_code):
-                logger.error("Negative response from Builder: %s",
-                             response.status_code)
-                self.status = self.FAILED
-            else:
-                self.status = self.BUILDING
-            self.save()
-        else:
-            logger.error("Site already building...")
-
-    def can_build(self):
-        return self.status is not self.BUILDING and self.current_deploy
+    def get_current_deploy(self):
+        return self.past_builds.filter(status=Build.SUCCESS)\
+                               .order_by('-created').first()
 
     def save(self, *args, **kwargs):
         if not self.url:
@@ -261,9 +250,6 @@ class Environment(models.Model):
                 self.url = "{0}-{1}.{2}".format(self.site.name.lower(),
                                                 self.name.lower(),
                                                 os.environ['BASE_URL'])
-        if (self.current_deploy and not
-                self.past_builds.filter(pk=self.current_deploy.pk).exists()):
-            self.past_builds.add(self.current_deploy)
         super(Environment, self).save(*args, **kwargs)
 
     def __str__(self):
@@ -273,3 +259,19 @@ class Environment(models.Model):
         verbose_name = _('Environment')
         verbose_name_plural = _('Environments')
         unique_together = ('name', 'site')
+
+
+class Deploy(models.Model):
+    """ A deployment event; represented as a link between an environment and a
+    build object.
+
+    :param environment: link to environment
+    :param build: link to build
+    :param deployed: Date this code was last deployed to an environment
+    """
+    environment = models.ForeignKey(Environment, on_delete=models.CASCADE)
+    build = models.ForeignKey(Build, on_delete=models.CASCADE)
+    deployed = models.DateTimeField(auto_now_add=True, editable=False)
+
+    def __str__(self):
+        return '%s %s' % (self.environment.site.name, self.deployed)

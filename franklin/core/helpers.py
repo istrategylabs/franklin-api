@@ -2,8 +2,10 @@ import json
 import logging
 import requests
 import sys
+from functools import wraps
 
 from django.core.urlresolvers import reverse
+from django.utils.decorators import available_attrs
 
 from Crypto.PublicKey import RSA
 from requests.exceptions import ConnectionError, HTTPError, Timeout
@@ -11,6 +13,7 @@ from rest_framework import exceptions, HTTP_HEADER_ENCODING
 from rest_framework import status
 from rest_framework.authentication import BaseAuthentication,\
                                           get_authorization_header
+from rest_framework.exceptions import APIException
 from social.apps.django_app.default.models import UserSocialAuth
 from social.apps.django_app.views import NAMESPACE
 from social.apps.django_app.utils import load_backend, load_strategy
@@ -106,3 +109,15 @@ def do_auth(oauth_token):
     social.extra_data['access_token'] = oauth_token
     social.save()
     return user
+
+
+def validate_request_payload(payload_value_list):
+    def decorator(func):
+        @wraps(func, assigned=available_attrs(func))
+        def _wrapped_view(self, request, *args, **kwargs):
+            for key in payload_value_list:
+                if key not in request.data:
+                    raise APIException("request missing key '{}'".format(key))
+            return func(self, request, *args, **kwargs)
+        return _wrapped_view
+    return decorator

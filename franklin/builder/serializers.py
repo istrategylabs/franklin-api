@@ -16,9 +16,21 @@ class OwnerSerializer(serializers.ModelSerializer):
 
 
 class BranchBuildSerializer(serializers.ModelSerializer):
+
+    def to_representation(self, instance):
+        result = super(BranchBuildSerializer, self).to_representation(instance)
+        result['status'] = instance.get_status_display()
+        if self.context and self.context.get('env', None):
+            deploy = instance.deploy_set\
+                             .filter(environment=self.context['env'])\
+                             .first()
+            if deploy:
+                result['deployed'] = deploy.deployed
+        return result
+
     class Meta:
         model = BranchBuild
-        fields = ('branch', 'git_hash', 'created')
+        fields = ('branch', 'git_hash', 'status', 'created')
 
 
 class EnvironmentSerializer(serializers.ModelSerializer):
@@ -35,26 +47,17 @@ class EnvironmentSerializer(serializers.ModelSerializer):
 
 class EnvironmentDetailSerializer(serializers.Serializer):
 
-    def to_representation(self, data):
-        env_serializer = EnvironmentSerializer(data)
+    def to_representation(self, instance):
+        env_serializer = EnvironmentSerializer(instance)
         result = env_serializer.data
-        current_deploy = data.current_deploy
+        current_deploy = instance.get_current_deploy()
         result['build'] = {}
         if current_deploy and hasattr(current_deploy, 'branchbuild'):
             build = BranchBuild.objects.get(created=current_deploy.created)
-            serializer = BranchBuildSerializer(build)
+            serializer = BranchBuildSerializer(
+                    build, context={'env': instance})
             result['build'] = serializer.data
         return result
-
-
-class EnvironmentStatusSerializer(serializers.ModelSerializer):
-
-    def to_representation(self, instance):
-        return {'status': instance.get_status_display(), }
-
-    class Meta:
-        model = Environment
-        fields = ('status',)
 
 
 class SiteSerializer(serializers.ModelSerializer):

@@ -25,7 +25,6 @@ Now with Github deploys!
       BASE_URL=franklinstatic.com
       SECRET_KEY=<your_secret_key>                 (random key used by django)
       BUILDER_URL=<franklin_builder_url>           (where api can call the running builder)
-      ENV='local'
       API_BASE_URL=<franklin_api_url>              (used for services like github to call. usually an ngrok url for testing)
       SOCIAL_AUTH_GITHUB_KEY=<github_client_id>
       SOCIAL_AUTH_GITHUB_SECRET=<github_client_secret>

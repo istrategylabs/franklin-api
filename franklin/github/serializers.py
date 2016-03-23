@@ -1,7 +1,7 @@
 import logging
 from rest_framework import serializers
 
-from builder.models import Owner, Site
+from builder.models import BranchBuild, Owner, Site
 
 logger = logging.getLogger(__name__)
 
@@ -78,3 +78,13 @@ class GithubWebhookSerializer(serializers.Serializer):
             # code was push to, or the name of the created tag
             return self.validated_data.get('ref', None)
         return None
+
+    def create_build_and_deploy(self):
+        site = self.get_existing_site()
+        git_hash = self.get_event_hash()
+        environment = site.get_deployable_environment(
+            self.get_change_location(), git_hash, self.is_tag_event())
+        if environment:
+            build, created = BranchBuild.objects.create(
+                git_hash=git_hash, site=site)
+            build.deploy(environment)
