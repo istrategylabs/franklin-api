@@ -4,6 +4,7 @@ from unittest import mock
 
 from django.test import TestCase
 
+from .exceptions import ServiceUnavailable
 from .helpers import make_rest_get_call, make_rest_post_call
 
 
@@ -26,22 +27,22 @@ class HelpersTestCase(TestCase):
     def test_make_rest_post_call_conn_error(self, mock_post):
         """ Tests make_rest_post_call when the call has an Connection exception.
         """
-        response = make_rest_post_call(self.url, self.headers, self.body)
-        self.assertEqual(response.status_code, 500)
+        with self.assertRaises(ServiceUnavailable):
+            make_rest_post_call(self.url, self.headers, self.body)
 
     @mock.patch('core.helpers.requests.post', side_effect=HTTPError)
     def test_make_rest_post_call_http_error(self, mock_post):
         """ Tests make_rest_post_call when the call has an HTTP exception.
         """
-        response = make_rest_post_call(self.url, self.headers, self.body)
-        self.assertEqual(response.status_code, 500)
+        with self.assertRaises(ServiceUnavailable):
+            make_rest_post_call(self.url, self.headers, self.body)
 
     @mock.patch('core.helpers.requests.post', side_effect=Timeout)
     def test_make_rest_post_call_timeout_error(self, mock_post):
         """ Tests make_rest_post_call when the call has an Timeout exception.
         """
-        response = make_rest_post_call(self.url, self.headers, self.body)
-        self.assertEqual(response.status_code, 500)
+        with self.assertRaises(ServiceUnavailable):
+            make_rest_post_call(self.url, self.headers, self.body)
 
     @mock.patch('core.helpers.requests.post')
     def test_make_rest_post_call_error(self, mock_post):
@@ -59,22 +60,22 @@ class HelpersTestCase(TestCase):
     def test_make_rest_get_call_conn_error(self, mock_post):
         """ Tests make_rest_get_call when the call has an Connection exception.
         """
-        response = make_rest_get_call(self.url, self.headers)
-        self.assertEqual(response.status_code, 500)
+        with self.assertRaises(ServiceUnavailable):
+            make_rest_get_call(self.url, self.headers)
 
     @mock.patch('core.helpers.requests.get', side_effect=HTTPError)
     def test_make_rest_get_call_http_error(self, mock_post):
         """ Tests make_rest_get_call when the call has an HTTP exception.
         """
-        response = make_rest_get_call(self.url, self.headers)
-        self.assertEqual(response.status_code, 500)
+        with self.assertRaises(ServiceUnavailable):
+            make_rest_get_call(self.url, self.headers)
 
     @mock.patch('core.helpers.requests.get', side_effect=Timeout)
     def test_make_rest_get_call_timeout_error(self, mock_post):
         """ Tests make_rest_get_call when the call has an Timeout exception.
         """
-        response = make_rest_get_call(self.url, self.headers)
-        self.assertEqual(response.status_code, 500)
+        with self.assertRaises(ServiceUnavailable):
+            make_rest_get_call(self.url, self.headers)
 
     @mock.patch('core.helpers.requests.get')
     def test_make_rest_get_call_error(self, mock_post):

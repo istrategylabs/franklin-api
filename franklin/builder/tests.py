@@ -4,7 +4,8 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from .models import BranchBuild, Environment, Owner, Site, TagBuild
+from .models import Build, BranchBuild, Deploy, Environment, Owner, Site
+from core.exceptions import ServiceUnavailable
 from github.serializers import GithubWebhookSerializer
 
 
@@ -52,7 +53,7 @@ class SiteTestCase(TestCase):
         self.assertTrue(self.site.environments
                             .filter(name=self.site.DEFAULT_ENV).exists())
 
-    def test_get_deployable_event_branch(self):
+    def test_get_deployable_environment_branch(self):
         """ Tests the model method that should return an environment after
         correctly validating a branch push event from github
         """
@@ -61,13 +62,13 @@ class SiteTestCase(TestCase):
             event = github_event.get_change_location()
             git_hash = github_event.get_event_hash()
             is_tag_event = github_event.is_tag_event()
-            matching_env = self.site.get_deployable_event(
-                    event, git_hash, is_tag_event)
+            matching_env = self.site.get_deployable_environment(
+                event, git_hash, is_tag_event)
             self.assertEqual(matching_env, self.env)
         else:
             self.fail(github_event.errors)
 
-    def test_get_deployable_event_wrong_branch(self):
+    def test_get_deployable_environment_wrong_branch(self):
         """ Tests the model method does not return an environment after
         correctly validating a branch push event from github for a
         non-registered branch
@@ -78,31 +79,9 @@ class SiteTestCase(TestCase):
             event = github_event.get_change_location()
             git_hash = github_event.get_event_hash()
             is_tag_event = github_event.is_tag_event()
-            matching_env = self.site.get_deployable_event(
-                    event, git_hash, is_tag_event)
+            matching_env = self.site.get_deployable_environment(
+                event, git_hash, is_tag_event)
             self.assertIsNone(matching_env)
-        else:
-            self.fail(github_event.errors)
-
-    def test_get_deployable_event_tag(self):
-        """ Tests the model method that should return an environment after
-        correctly validating a tag event from github
-        """
-        # Also our default production env to only deploy on tags
-        self.env.deploy_type = Environment.TAG
-        self.env.tag_regex = 'v[0-9]\.[0-9]\.[0-9]'
-        self.env.save()
-        # Alter our github payload to be a tag event
-        self.git_message['ref'] = 'v1.0.2'
-        self.git_message['ref_type'] = 'tag'
-        github_event = GithubWebhookSerializer(data=self.git_message)
-        if github_event.is_valid():
-            event = github_event.get_change_location()
-            git_hash = github_event.get_event_hash()
-            is_tag_event = github_event.is_tag_event()
-            matching_env = self.site.get_deployable_event(
-                    event, git_hash, is_tag_event)
-            self.assertEqual(matching_env, self.env)
         else:
             self.fail(github_event.errors)
 
@@ -128,13 +107,12 @@ class EnvironmentTestCase(TestCase):
         self.env = self.site.environments.get(name=self.site.DEFAULT_ENV)
         self.branch_build = BranchBuild.objects.create(
             git_hash='asdf1234', branch=self.env.branch, site=self.site)
-        self.env.current_deploy = self.branch_build
 
     def test_past_builds(self):
         """ Current deployment is always added to past builds on save.
         """
         self.assertFalse(self.env.past_builds.exists())
-        self.env.save()
+        Deploy.objects.create(build=self.branch_build, environment=self.env)
         self.assertTrue(self.env.past_builds.exists())
 
     def test_production_env_url(self):
@@ -153,45 +131,6 @@ class EnvironmentTestCase(TestCase):
             base_domain=os.environ['BASE_URL'])
         self.assertEqual(new_env.url, expected)
 
-    def test_default_env_status(self):
-        """ All environments start with a status of registered on creation
-        """
-        self.assertEqual(self.env.status, Environment.REGISTERED)
-
-    @mock.patch('core.helpers.requests.post')
-    def test_building_env(self, mock_post):
-        """ Tests the model method that calls franklin-builder when an
-        environment is ready to be deployed for a branch.
-        """
-        mock_post.return_value = mock.Mock(status_code=200)
-
-        self.env.build()
-        self.assertEqual(self.env.status, Environment.BUILDING)
-
-    @mock.patch('core.helpers.requests.post')
-    def test_building_env_negative(self, mock_post):
-        """ Tests the model method that calls franklin-builder when builder
-        returns an error.
-        """
-        mock_post.return_value = mock.Mock(status_code=500)
-
-        self.env.build()
-        self.assertEqual(self.env.status, Environment.FAILED)
-
-    @mock.patch('core.helpers.requests.post')
-    def test_building_env_tag(self, mock_post):
-        """ Tests the model method that calls franklin-builder when an
-        environment is ready to be deployed for a tag.
-        """
-        mock_post.return_value = mock.Mock(status_code=200)
-
-        # Create a tag event build
-        tag_build = TagBuild.objects.create(tag='v1.0.2', site=self.site)
-        self.env.current_deploy = tag_build
-
-        self.env.build()
-        self.assertEqual(self.env.status, Environment.BUILDING)
-
 
 class BuildTestCase(TestCase):
 
@@ -209,18 +148,13 @@ class BuildTestCase(TestCase):
 
         self.owner = Owner.objects.create(
             name='istrategylabs', github_id=607333)
-        self.site = Site.objects.create(owner=self.owner, name='franklin-dashboard',
-                                   github_id=45864453)
+        self.site = Site.objects.create(
+            owner=self.owner, name='franklin-dashboard', github_id=45864453)
         self.site.save(user=self.user)
-        self.env = self.site.environments.filter(name=self.site.DEFAULT_ENV).first()
-        self.tag_build = TagBuild.objects.create(tag='v1.0.2', site=self.site)
+        self.env = self.site.environments.filter(name=self.site.DEFAULT_ENV)\
+                                         .first()
         self.branch_build = BranchBuild.objects.create(
             git_hash='asdf1234', branch='master', site=self.site)
-
-    def test_tag_build_path(self):
-        """ Test that object instantiation saves correct path. """
-        expected = "{site}/{tag}".format(site=self.site.github_id, tag='v102')
-        self.assertEqual(self.tag_build.path, expected)
 
     def test_branch_build_path(self):
         """ Test that object instantiation saves correct path. """
@@ -228,11 +162,28 @@ class BuildTestCase(TestCase):
                                               git_hash='asdf1234')
         self.assertEqual(self.branch_build.path, expected)
 
-    def test_past_builds_lookup(self):
-        """ Tests that when a build is added as the current deploy for an
-        environment, it's also added to the list of past builds
+    def test_default_build_status(self):
+        """ All build objects start with a status of new on creation
         """
-        self.env.current_deploy = self.tag_build
-        self.env.save()
-        self.assertTrue(self.env.past_builds
-                            .filter(pk=self.env.current_deploy.pk).exists())
+        self.assertEqual(self.branch_build.status, Build.NEW)
+
+    @mock.patch('core.helpers.requests.post')
+    def test_building_env(self, mock_post):
+        """ Tests the model method that calls franklin-builder when an
+        environment is ready to be deployed for a branch.
+        """
+        mock_post.return_value = mock.Mock(status_code=200)
+
+        self.branch_build.deploy(self.env)
+        self.assertEqual(self.branch_build.status, Build.BUILDING)
+
+    @mock.patch('core.helpers.requests.post')
+    def test_building_env_negative(self, mock_post):
+        """ Tests the model method that calls franklin-builder when builder
+        returns an error.
+        """
+        mock_post.return_value = mock.Mock(status_code=500)
+
+        with self.assertRaises(ServiceUnavailable):
+            self.branch_build.deploy(self.env)
+        self.assertEqual(self.branch_build.status, Build.NEW)
