@@ -9,14 +9,15 @@ from django.utils.decorators import available_attrs
 
 from Crypto.PublicKey import RSA
 from requests.exceptions import ConnectionError, HTTPError, Timeout
-from rest_framework import exceptions, HTTP_HEADER_ENCODING
-from rest_framework import status
+from rest_framework import HTTP_HEADER_ENCODING
 from rest_framework.authentication import BaseAuthentication,\
-                                          get_authorization_header
-from rest_framework.exceptions import APIException
+    get_authorization_header
+from rest_framework.exceptions import AuthenticationFailed
 from social.apps.django_app.default.models import UserSocialAuth
 from social.apps.django_app.views import NAMESPACE
 from social.apps.django_app.utils import load_backend, load_strategy
+
+from .exceptions import BadRequest, ServiceUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +36,11 @@ def make_rest_call(method, url, headers, data=None):
     except:
         logger.error('Unexpected REST %s error: %s', method, sys.exc_info()[0])
 
-    if response is not None:
-        if not status.is_success(response.status_code):
-            logger.warn('Bad %s response code of %s',
-                        method, response.status_code)
-    else:
-        logger.error('%s response was None. This shouldn\'t happen', method)
-        response = requests.Response()
-        response.status_code = 500
+    if response is None:
+        base_msg = 'Service temporarily unavailable:'
+        msg = '{0} {1}'.format(base_msg, url.split('/')[2])
+        raise ServiceUnavailable(detail=msg)
+
     return response
 
 
@@ -71,13 +69,12 @@ class SocialAuthentication(BaseAuthentication):
     """
     def authenticate(self, request):
         auth_header = get_authorization_header(request)\
-                            .decode(HTTP_HEADER_ENCODING)
+            .decode(HTTP_HEADER_ENCODING)
         auth = auth_header.split()
         if not auth or auth[0].lower() != 'bearer':
             return None
         if len(auth) == 1:
-            msg = 'Credentials are malformed'
-            raise exceptions.AuthenticationFailed(msg)
+            raise AuthenticationFailed('Credentials are malformed')
         oauth_token = auth[1]
 
         social_user = UserSocialAuth.objects\
@@ -100,11 +97,9 @@ def do_auth(oauth_token):
     try:
         user = backend.do_auth(access_token=oauth_token)
     except requests.HTTPError as e:
-        msg = e.response.json()
-        raise exceptions.AuthenticationFailed(msg)
+        raise AuthenticationFailed(e.response.json())
     if not user:
-        msg = 'Bad credentials'
-        raise exceptions.AuthenticationFailed(msg)
+        raise AuthenticationFailed('Bad credentials')
     social = user.social_auth.get(provider='github')
     social.extra_data['access_token'] = oauth_token
     social.save()
@@ -117,7 +112,7 @@ def validate_request_payload(payload_value_list):
         def _wrapped_view(self, request, *args, **kwargs):
             for key in payload_value_list:
                 if key not in request.data:
-                    raise APIException("request missing key '{}'".format(key))
+                    raise BadRequest("request missing key '{}'".format(key))
             return func(self, request, *args, **kwargs)
         return _wrapped_view
     return decorator

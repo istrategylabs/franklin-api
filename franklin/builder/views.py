@@ -1,6 +1,6 @@
 import logging
 
-from rest_framework import status
+from rest_framework.status import HTTP_200_OK
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
@@ -35,4 +35,4 @@ class UpdateBuildStatus(APIView):
         build.save()
         if build.status == Build.SUCCESS:
             Deploy.objects.create(build=build, environment=environment)
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=HTTP_200_OK)

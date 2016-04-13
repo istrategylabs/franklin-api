@@ -1,3 +1,5 @@
+import json
+import logging
 import os
 import yaml
 
@@ -5,11 +7,49 @@ from django.core.urlresolvers import reverse
 
 from rest_framework import status
 
-from core.helpers import make_rest_delete_call, make_rest_get_call, \
-        make_rest_post_call
+from core.helpers import make_rest_call
+from core.exceptions import BadRequest, ServiceUnavailable
+
+logger = logging.getLogger(__name__)
 
 repo_base_url = 'https://api.github.com/repo'
 repos_base_url = 'https://api.github.com/repos'
+
+
+def make_rest_get_call(url, headers):
+    response = make_rest_call('GET', url, headers)
+    if not status.is_success(response.status_code):
+        logger.warn('Bad GET response of %s', response.status_code)
+        if response.status == status.HTTP_400_BAD_REQUEST:
+            raise BadRequest()
+        base_msg = 'Service temporarily unavailable:'
+        msg = '{0} {1}'.format(base_msg, url.split('/')[2])
+        raise ServiceUnavailable(detail=msg)
+    return response
+
+
+def make_rest_post_call(url, headers, body):
+    response = make_rest_call('POST', url, headers, json.dumps(body))
+    if not status.is_success(response.status_code):
+        logger.warn('Bad POST response of %s', response.status_code)
+        if response.status == status.HTTP_400_BAD_REQUEST:
+            raise BadRequest()
+        base_msg = 'Service temporarily unavailable:'
+        msg = '{0} {1}'.format(base_msg, url.split('/')[2])
+        raise ServiceUnavailable(detail=msg)
+    return response
+
+
+def make_rest_delete_call(url, headers):
+    response = make_rest_call('DELETE', url, headers)
+    if not status.is_success(response.status_code):
+        logger.warn('Bad DELETE response of %s', response.status_code)
+        if response.status == status.HTTP_400_BAD_REQUEST:
+            raise BadRequest()
+        base_msg = 'Service temporarily unavailable:'
+        msg = '{0} {1}'.format(base_msg, url.split('/')[2])
+        raise ServiceUnavailable(detail=msg)
+    return response
 
 
 def get_auth_header(user):
@@ -17,9 +57,9 @@ def get_auth_header(user):
     token = social.extra_data['access_token']
     # TODO - Confirm that a header token is the best/most secure way to go
     headers = {
-                'content-type': 'application/json',
-                'Authorization': 'token ' + token
-              }
+        'content-type': 'application/json',
+        'Authorization': 'token ' + token
+    }
     return headers
 
 
@@ -59,10 +99,10 @@ def create_repo_deploy_key(site, user):
     url = build_repos_url(site.owner.name, site.name, 'keys')
     headers = get_auth_header(user)
     body = {
-                'title': 'franklin',
-                'key': site.deploy_key,
-                'read_only': True
-            }
+        'title': 'franklin',
+        'key': site.deploy_key,
+        'read_only': True
+    }
     return make_rest_post_call(url, headers, body)
 
 
@@ -80,16 +120,15 @@ def create_repo_webhook(site, user):
     url = build_repos_url(site.owner.name, site.name, 'hooks')
     headers = get_auth_header(user)
     body = {
-                'name': 'web',
-                'events': ['push'],
-                'active': True,
-                'config': {
-                    'url': os.environ['API_BASE_URL'] + \
-                        reverse('webhook:github'),
-                    'content_type': 'json',
-                    'secret': os.environ['GITHUB_SECRET']
-                }
-            }
+        'name': 'web',
+        'events': ['push'],
+        'active': True,
+        'config': {
+            'url': os.environ['API_BASE_URL'] + reverse('webhook:github'),
+            'content_type': 'json',
+            'secret': os.environ['GITHUB_SECRET']
+        }
+    }
     return make_rest_post_call(url, headers, body)
 
 

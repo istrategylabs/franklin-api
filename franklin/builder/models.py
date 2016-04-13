@@ -8,6 +8,7 @@ from django.utils.translation import ugettext as _
 
 from rest_framework import status
 
+from core.exceptions import ServiceUnavailable
 from core.helpers import generate_ssh_keys, make_rest_post_call
 from github.api import get_branch_details, get_default_branch
 
@@ -83,7 +84,7 @@ class Site(models.Model):
         if not self.environments.exists() and user:
             branch = get_default_branch(self, user)
             self.environments.create(
-                    name=self.DEFAULT_ENV, deploy_type=Environment.PROMOTE)
+                name=self.DEFAULT_ENV, deploy_type=Environment.PROMOTE)
             self.environments.create(name='Staging', branch=branch)
         super(Site, self).save(*args, **kwargs)
 
@@ -148,11 +149,10 @@ class Build(models.Model):
             }
             response = make_rest_post_call(url, headers, body)
             if not status.is_success(response.status_code):
-                logger.error("Negative response from Builder: %s",
-                             response.status_code)
-                self.status = self.FAILED
-            else:
-                self.status = self.BUILDING
+                logger.warn('Builder down? %s', response.status_code)
+                msg = 'Service temporarily unavailable: franklin-build'
+                raise ServiceUnavailable(detail=msg)
+            self.status = self.BUILDING
             self.save()
         else:
             logger.error("Build being/been built by builder...")
