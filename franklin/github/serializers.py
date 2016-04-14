@@ -32,11 +32,11 @@ class RepositorySerializer(serializers.Serializer):
         repo_id = validated_data.get('id', None)
         if owner_id and repo_id:
             owner, o_created = Owner.objects.update_or_create(
-                    github_id=owner_id, defaults={'name': owner_data['login']})
+                github_id=owner_id, defaults={'name': owner_data['login']})
             if owner:
                 site, s_created = Site.objects.update_or_create(
-                        github_id=repo_id, owner=owner,
-                        defaults={'name': validated_data['name']})
+                    github_id=repo_id, owner=owner,
+                    defaults={'name': validated_data['name']})
                 if site:
                     return site
         return None
@@ -82,9 +82,10 @@ class GithubWebhookSerializer(serializers.Serializer):
     def create_build_and_deploy(self):
         site = self.get_existing_site()
         git_hash = self.get_event_hash()
-        environment = site.get_deployable_environment(
-            self.get_change_location(), git_hash, self.is_tag_event())
-        if environment:
-            build, created = BranchBuild.objects.create(
-                git_hash=git_hash, site=site)
-            build.deploy(environment)
+        if site:
+            environment = site.get_deployable_environment(
+                self.get_change_location(), git_hash, self.is_tag_event())
+            if environment:
+                build, created = BranchBuild.objects.create(
+                    git_hash=git_hash, site=site)
+                build.deploy(environment)

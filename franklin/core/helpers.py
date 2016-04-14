@@ -38,7 +38,8 @@ def make_rest_call(method, url, headers, data=None):
 
     if response is None:
         base_msg = 'Service temporarily unavailable:'
-        msg = '{0} {1}'.format(base_msg, url.split('/')[2])
+        failed_resource = url.split('/')[2] if url.count('/') > 2 else url
+        msg = '{0} {1}'.format(base_msg, failed_resource)
         raise ServiceUnavailable(detail=msg)
 
     return response

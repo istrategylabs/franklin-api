@@ -55,7 +55,7 @@ class EnvironmentDetailSerializer(serializers.Serializer):
         if current_deploy and hasattr(current_deploy, 'branchbuild'):
             build = BranchBuild.objects.get(created=current_deploy.created)
             serializer = BranchBuildSerializer(
-                    build, context={'env': instance})
+                build, context={'env': instance})
             result['build'] = serializer.data
         return result
 

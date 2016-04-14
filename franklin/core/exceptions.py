@@ -23,4 +23,4 @@ class BadResource(APIException):
 
 class BadRequest(APIException):
     status_code = status.HTTP_400_BAD_REQUEST
-    default_detail = 'Problems parsing JSON'
+    default_detail = 'Problem parsing JSON'

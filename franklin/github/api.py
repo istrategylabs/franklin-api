@@ -18,13 +18,18 @@ repos_base_url = 'https://api.github.com/repos'
 
 def make_rest_get_call(url, headers):
     response = make_rest_call('GET', url, headers)
+    # TODO - This, and other github specific validation here may be able to
+    # jsut be done in core/helpers
     if not status.is_success(response.status_code):
         logger.warn('Bad GET response of %s', response.status_code)
-        if response.status == status.HTTP_400_BAD_REQUEST:
+        if status.is_server_error(response.status_code):
+            base_msg = 'Service temporarily unavailable:'
+            msg = '{0} {1}'.format(base_msg, url.split('/')[2])
+            raise ServiceUnavailable(detail=msg)
+        elif status.is_client_error(response.status_code):
             raise BadRequest()
-        base_msg = 'Service temporarily unavailable:'
-        msg = '{0} {1}'.format(base_msg, url.split('/')[2])
-        raise ServiceUnavailable(detail=msg)
+        elif status.is_redirect(response.status_code):
+            logger.warn('Redirect %s for %s', response.status_code, url)
     return response
 
 
@@ -32,7 +37,7 @@ def make_rest_post_call(url, headers, body):
     response = make_rest_call('POST', url, headers, json.dumps(body))
     if not status.is_success(response.status_code):
         logger.warn('Bad POST response of %s', response.status_code)
-        if response.status == status.HTTP_400_BAD_REQUEST:
+        if response.status_code == status.HTTP_400_BAD_REQUEST:
             raise BadRequest()
         base_msg = 'Service temporarily unavailable:'
         msg = '{0} {1}'.format(base_msg, url.split('/')[2])
@@ -44,7 +49,7 @@ def make_rest_delete_call(url, headers):
     response = make_rest_call('DELETE', url, headers)
     if not status.is_success(response.status_code):
         logger.warn('Bad DELETE response of %s', response.status_code)
-        if response.status == status.HTTP_400_BAD_REQUEST:
+        if response.status_code == status.HTTP_400_BAD_REQUEST:
             raise BadRequest()
         base_msg = 'Service temporarily unavailable:'
         msg = '{0} {1}'.format(base_msg, url.split('/')[2])

@@ -11,7 +11,7 @@ class UserTestCase(TestCase):
         self.user = User.objects.create(username="test", password="asdf")
         self.owner = Owner.objects.create(name='owner', github_id=1)
         self.site = Site.objects.create(
-                        name='project', github_id=2, owner=self.owner)
+            name='project', github_id=2, owner=self.owner)
         # Mock response from github for user's repo list
         self.repos = []
         repo_data = {}

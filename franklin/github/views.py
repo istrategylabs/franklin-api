@@ -1,20 +1,20 @@
 import logging
 import os
 
-from django.http import Http404
+from django.shortcuts import get_object_or_404
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, \
-    HTTP_204_NO_CONTENT
+    HTTP_204_NO_CONTENT, HTTP_503_SERVICE_UNAVAILABLE
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from .api import create_repo_deploy_key, create_repo_webhook, \
     delete_deploy_key, delete_webhook, get_access_token, get_all_repos, \
     get_repo
-from .permissions import GithubOnly, UserIsProjectAdmin
+from .permissions import GithubOnly, UserHasProjectWritePermission
 from .serializers import GithubWebhookSerializer, RepositorySerializer
 from builder.models import Build, BranchBuild, Deploy, Environment, Site
 from builder.serializers import BranchBuildSerializer, FlatSiteSerializer, \
@@ -33,7 +33,7 @@ class ProjectList(APIView):
     Get all repos currently deployed by Franklin that the user can manage or
     register a new repo
     """
-    permission_classes = (UserIsProjectAdmin,)
+    permission_classes = (UserHasProjectWritePermission,)
 
     def get(self, request, format=None):
         sites = request.user.details.get_user_repos()
@@ -47,16 +47,10 @@ class ProjectList(APIView):
         if Site.objects.filter(name=repo, owner__name=owner).count() > 0:
             raise ResourceExists()
 
-        test_owner = type("", (object,), {})()
-        test_owner.name = owner
-        test_site = type("", (object,), {})()
-        test_site.name = repo
-        test_site.owner = test_owner
-        self.check_object_permissions(request, test_site)
-
         # New project, call github for the details
         result = get_repo(owner, repo, request.user)
         serializer = RepositorySerializer(data=result.json())
+
         if serializer and serializer.is_valid():
             site = serializer.save()
             try:
@@ -80,23 +74,15 @@ class ProjectDetail(APIView):
     """
     Rerieve or Delete a Github project with franklin
     """
-    permission_classes = (UserIsProjectAdmin,)
+    permission_classes = (UserHasProjectWritePermission,)
 
-    def get_object(self, pk):
-        try:
-            return Site.objects.get(github_id=pk)
-        except Site.DoesNotExist:
-            raise Http404
+    def get(self, request, repo, format=None):
+        site = get_object_or_404(Site, github_id=repo)
+        serializer = SiteSerializer(site, context={'user': request.user})
+        return Response(serializer.data, status=HTTP_200_OK)
 
-    def get(self, request, pk, format=None):
-        site = self.get_object(pk)
-        site_serializer = SiteSerializer(site, context={'user': request.user})
-        return Response(site_serializer.data, status=HTTP_200_OK)
-
-    def delete(self, request, pk, format=None):
-        site = self.get_object(pk)
-        # Before proceeding, check that user is allowed
-        self.check_object_permissions(request, site)
+    def delete(self, request, repo, format=None):
+        site = get_object_or_404(Site, github_id=repo)
         site.is_active = False
         site.save()
         return delete_site(site, request.user)
@@ -127,15 +113,12 @@ def deployable_repos(request):
 
 
 @api_view(['GET', 'POST'])
-def builds(request, pk):
+def builds(request, repo):
     """
-    Deploy the tip of the default branch for the project or return all builds
-    that exist for the project
+    Deploy the tip of the default branch for the project
+    or return all builds that exist for the project
     """
-    try:
-        site = Site.objects.get(github_id=pk)
-    except Site.DoesNotExist:
-        raise Http404
+    site = get_object_or_404(Site, github_id=repo)
 
     if request.method == 'GET':
         builds = BranchBuild.objects.filter(site=site).all()
@@ -143,13 +126,20 @@ def builds(request, pk):
         return Response(serializer.data, status=HTTP_200_OK)
     elif request.method == 'POST':
         branch, git_hash = site.get_newest_commit(request.user)
-        environment = site.environments.filter(name='Staging').first()
+        env = site.environments.filter(name='Staging').first()
 
         build, created = BranchBuild.objects.get_or_create(
             git_hash=git_hash, branch=branch, site=site)
         if not created:
             raise ResourceExists()
-        build.deploy(environment)
+        try:
+            build.deploy(env)
+        except ServiceUnavailable as e:
+            serializer = BranchBuildSerializer(build)
+            return Response({
+                'detail': e.detail,
+                'build': serializer.data
+            }, status=HTTP_503_SERVICE_UNAVAILABLE)
 
         serializer = BranchBuildSerializer(build)
         return Response(serializer.data, status=HTTP_201_CREATED)
@@ -186,7 +176,7 @@ class PromoteEnvironment(APIView):
             if build.status == Build.SUCCESS and build.environments.exists():
                 Deploy.objects.create(build=build, environment=environment)
                 return Response(status=HTTP_201_CREATED)
-            elif build.status == Build.FAILED:
+            elif build.status == Build.FAILED or build.status == Build.NEW:
                 build.deploy(environment)
                 return Response(status=HTTP_201_CREATED)
         raise BadRequest()
