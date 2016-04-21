@@ -15,7 +15,7 @@ webhook_patterns = [
 ]
 
 
-urlpatterns = [
+v1_patterns = [
     # Github Social Signin
     url(r'^auth/github/$', get_auth_token, name='get_token'),
 
@@ -34,12 +34,16 @@ urlpatterns = [
     # User specific endpoints
     url(r'^user/$', user_details, name='user_details'),
 
-    # Webhooks
-    url(r'^webhooks/', include(webhook_patterns, namespace='webhook')),
-
     # Github passthrough endpoints
     url(r'^repos/$', deployable_repos, name='deployable_repos'),
 
     # Utilities
     url(r'^health/$', health, name='health'),
+]
+
+urlpatterns = [
+    url(r'^v1/', include(v1_patterns)),
+
+    # Webhooks
+    url(r'^webhooks/', include(webhook_patterns, namespace='webhook')),
 ]

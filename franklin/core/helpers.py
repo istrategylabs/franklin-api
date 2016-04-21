@@ -3,13 +3,14 @@ import logging
 import requests
 import sys
 from functools import wraps
+from urllib.parse import urlparse
 
 from django.core.urlresolvers import reverse
 from django.utils.decorators import available_attrs
 
 from Crypto.PublicKey import RSA
 from requests.exceptions import ConnectionError, HTTPError, Timeout
-from rest_framework import HTTP_HEADER_ENCODING
+from rest_framework import HTTP_HEADER_ENCODING, status
 from rest_framework.authentication import BaseAuthentication,\
     get_authorization_header
 from rest_framework.exceptions import AuthenticationFailed
@@ -36,11 +37,14 @@ def make_rest_call(method, url, headers, data=None):
     except:
         logger.error('Unexpected REST %s error: %s', method, sys.exc_info()[0])
 
-    if response is None:
-        base_msg = 'Service temporarily unavailable:'
-        failed_resource = url.split('/')[2] if url.count('/') > 2 else url
-        msg = '{0} {1}'.format(base_msg, failed_resource)
+    if response is None or status.is_server_error(response.status_code):
+        msg = '{0} {1}'.format('Service temporarily unavailable:',
+                               urlparse(url).netloc)
         raise ServiceUnavailable(detail=msg)
+    elif status.is_client_error(response.status_code):
+        raise BadRequest()
+    elif status.is_redirect(response.status_code):
+        logger.warn('Redirect %s for %s', response.status_code, url)
 
     return response
 

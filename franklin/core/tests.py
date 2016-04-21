@@ -2,9 +2,10 @@ import os
 from requests.exceptions import ConnectionError, HTTPError, Timeout
 from unittest import mock
 
+from django.core.urlresolvers import reverse
 from django.test import TestCase
 
-from .exceptions import ServiceUnavailable
+from .exceptions import BadRequest, ServiceUnavailable
 from .helpers import make_rest_get_call, make_rest_post_call
 
 
@@ -15,13 +16,14 @@ class HelpersTestCase(TestCase):
         self.body = {
             "deploy_key": "deploy_key",
             "branch": "branch",
-            "tag": "tag",
             "git_hash": "git_hash",
             "repo_owner": "owner",
             "path": "path",
             "repo_name": "name",
-            "environment_id": 1
-            }
+            "environment": "staging",
+            "callback": os.environ['API_BASE_URL'] +
+                        reverse('webhook:builder', args=["githash132", ])
+        }
 
     @mock.patch('core.helpers.requests.post', side_effect=ConnectionError)
     def test_make_rest_post_call_conn_error(self, mock_post):
@@ -53,8 +55,8 @@ class HelpersTestCase(TestCase):
         mock_response.status_code = 400
         mock_post.return_value = mock_response
 
-        response = make_rest_post_call(self.url, self.headers, self.body)
-        self.assertEqual(response.status_code, 400)
+        with self.assertRaises(BadRequest):
+            make_rest_post_call(self.url, self.headers, self.body)
 
     @mock.patch('core.helpers.requests.get', side_effect=ConnectionError)
     def test_make_rest_get_call_conn_error(self, mock_post):
@@ -86,5 +88,5 @@ class HelpersTestCase(TestCase):
         mock_response.status_code = 400
         mock_post.return_value = mock_response
 
-        response = make_rest_get_call(self.url, self.headers)
-        self.assertEqual(response.status_code, 400)
+        with self.assertRaises(BadRequest):
+            make_rest_get_call(self.url, self.headers)

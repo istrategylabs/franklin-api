@@ -1,0 +1,22 @@
+{
+    "name": "foo",
+    "github_id": 45864453,
+    "owner": {
+        "name": "isl",
+        "github_id": 607333
+    },
+    "environments": [
+        {
+            "name": "Production",
+            "url": "foo.example.com",
+            "build": {}
+        },
+        {
+            "name": "Staging",
+            "url": "foo-staging.example.com",
+            "build": {}
+        }
+    ],
+    "default_branch": "staging",
+    "build": {}
+}

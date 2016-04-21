@@ -1,0 +1,17 @@
+{
+    "id": 45864453,
+    "full_name": "isl/foo",
+    "name": "foo",
+    "html_url": "http://github.com/isl/foo",
+    "default_branch": "staging",
+    "owner": {
+        "login": "isl",
+        "id": 607333
+    },
+    "permissions": {
+        "admin": true
+    },
+    "commit": {
+        "sha": "sdfsdfw2345sdf"
+    }
+}

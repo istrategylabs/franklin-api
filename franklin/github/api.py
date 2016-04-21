@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import yaml
@@ -7,54 +6,13 @@ from django.core.urlresolvers import reverse
 
 from rest_framework import status
 
-from core.helpers import make_rest_call
-from core.exceptions import BadRequest, ServiceUnavailable
+from core.helpers import make_rest_get_call, make_rest_post_call, \
+    make_rest_delete_call
 
 logger = logging.getLogger(__name__)
 
 repo_base_url = 'https://api.github.com/repo'
 repos_base_url = 'https://api.github.com/repos'
-
-
-def make_rest_get_call(url, headers):
-    response = make_rest_call('GET', url, headers)
-    # TODO - This, and other github specific validation here may be able to
-    # jsut be done in core/helpers
-    if not status.is_success(response.status_code):
-        logger.warn('Bad GET response of %s', response.status_code)
-        if status.is_server_error(response.status_code):
-            base_msg = 'Service temporarily unavailable:'
-            msg = '{0} {1}'.format(base_msg, url.split('/')[2])
-            raise ServiceUnavailable(detail=msg)
-        elif status.is_client_error(response.status_code):
-            raise BadRequest()
-        elif status.is_redirect(response.status_code):
-            logger.warn('Redirect %s for %s', response.status_code, url)
-    return response
-
-
-def make_rest_post_call(url, headers, body):
-    response = make_rest_call('POST', url, headers, json.dumps(body))
-    if not status.is_success(response.status_code):
-        logger.warn('Bad POST response of %s', response.status_code)
-        if response.status_code == status.HTTP_400_BAD_REQUEST:
-            raise BadRequest()
-        base_msg = 'Service temporarily unavailable:'
-        msg = '{0} {1}'.format(base_msg, url.split('/')[2])
-        raise ServiceUnavailable(detail=msg)
-    return response
-
-
-def make_rest_delete_call(url, headers):
-    response = make_rest_call('DELETE', url, headers)
-    if not status.is_success(response.status_code):
-        logger.warn('Bad DELETE response of %s', response.status_code)
-        if response.status_code == status.HTTP_400_BAD_REQUEST:
-            raise BadRequest()
-        base_msg = 'Service temporarily unavailable:'
-        msg = '{0} {1}'.format(base_msg, url.split('/')[2])
-        raise ServiceUnavailable(detail=msg)
-    return response
 
 
 def get_auth_header(user):
@@ -190,9 +148,9 @@ def get_all_repos(user):
 
             # If the header has a paging link called 'next', update our url
             # and continue with the while loop
-            if result.links and result.links.get('next', None):
-                url = result.links['next']['url']
-                have_next_page = True
+            # if result.links and result.links.get('next', None):
+            #     url = result.links['next']['url']
+            #     have_next_page = True
     return repos
 
 

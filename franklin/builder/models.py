@@ -6,8 +6,6 @@ from django.core.urlresolvers import reverse
 from django.db import models
 from django.utils.translation import ugettext as _
 
-from rest_framework import status
-
 from core.exceptions import ServiceUnavailable
 from core.helpers import generate_ssh_keys, make_rest_post_call
 from github.api import get_branch_details, get_default_branch
@@ -147,9 +145,10 @@ class Build(models.Model):
                 "environment": environment.name.lower(),
                 'callback': callback
             }
-            response = make_rest_post_call(url, headers, body)
-            if not status.is_success(response.status_code):
-                logger.warn('Builder down? %s', response.status_code)
+            try:
+                make_rest_post_call(url, headers, body)
+            except:
+                logger.warn('Builder down?')
                 msg = 'Service temporarily unavailable: franklin-build'
                 raise ServiceUnavailable(detail=msg)
             self.status = self.BUILDING

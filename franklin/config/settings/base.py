@@ -147,7 +147,8 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'core.helpers.SocialAuthentication',
     ),
-    'DEFAULT_METADATA_CLASS': 'rest_framework.metadata.SimpleMetadata'
+    'DEFAULT_METADATA_CLASS': 'rest_framework.metadata.SimpleMetadata',
+    'TEST_REQUEST_DEFAULT_FORMAT': 'json'
 }
 
 # Logging

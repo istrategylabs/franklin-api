@@ -2,8 +2,8 @@ Django==1.8.3
 dj-database-url==0.3.0
 whitenoise==2.0.3
 psycopg2==2.6.1
-requests==2.7.0
-djangorestframework==3.2.2
+requests==2.9.1
+djangorestframework==3.3.3
 gunicorn==19.3.0
 pyyaml==3.11
 python-social-auth==0.2.13

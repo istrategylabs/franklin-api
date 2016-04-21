@@ -19,7 +19,7 @@ class UserDetails(models.Model):
     :param sites: List of sites the user has permission to deploy
     """
     user = models.OneToOneField(
-            settings.AUTH_USER_MODEL, related_name='details')
+        settings.AUTH_USER_MODEL, related_name='details')
     sites = models.ManyToManyField(Site, related_name='admins')
 
     def get_user_repos(self):
@@ -39,7 +39,7 @@ class UserDetails(models.Model):
         all_sites = Site.objects.all()
         for repo in repos:
             site = all_sites.filter(github_id=repo['id']).first()
-            if site and repo['permissions']['admin'] == True:
+            if site and repo['permissions']['admin'] is True:
                 self.sites.add(site)
         return self.sites.all()
 

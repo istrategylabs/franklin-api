@@ -130,8 +130,9 @@ def builds(request, repo):
 
         build, created = BranchBuild.objects.get_or_create(
             git_hash=git_hash, branch=branch, site=site)
-        if not created:
-            raise ResourceExists()
+        if not created and build.status == Build.SUCCESS:
+            msg = 'Resource already exists and is promotable'
+            raise ResourceExists(detail=msg)
         try:
             build.deploy(env)
         except ServiceUnavailable as e:
