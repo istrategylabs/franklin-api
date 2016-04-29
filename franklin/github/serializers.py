@@ -82,10 +82,11 @@ class GithubWebhookSerializer(serializers.Serializer):
     def create_build_and_deploy(self):
         site = self.get_existing_site()
         git_hash = self.get_event_hash()
+        branch = self.get_change_location().split('/')[2]
         if site:
             environment = site.get_deployable_environment(
                 self.get_change_location(), git_hash, self.is_tag_event())
             if environment:
-                build, created = BranchBuild.objects.create(
-                    git_hash=git_hash, site=site)
+                build, created = BranchBuild.objects.get_or_create(
+                    git_hash=git_hash, branch=branch, site=site)
                 build.deploy(environment)

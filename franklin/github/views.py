@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import NotFound
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, \
     HTTP_204_NO_CONTENT, HTTP_503_SERVICE_UNAVAILABLE
 from rest_framework.views import APIView
@@ -33,7 +33,8 @@ class ProjectList(APIView):
     Get all repos currently deployed by Franklin that the user can manage or
     register a new repo
     """
-    permission_classes = (UserHasProjectWritePermission,)
+    permission_classes = (IsAuthenticated,
+                          UserHasProjectWritePermission)
 
     def get(self, request, format=None):
         sites = request.user.details.get_user_repos()
@@ -74,7 +75,8 @@ class ProjectDetail(APIView):
     """
     Rerieve or Delete a Github project with franklin
     """
-    permission_classes = (UserHasProjectWritePermission,)
+    permission_classes = (IsAuthenticated,
+                          UserHasProjectWritePermission)
 
     def get(self, request, repo, format=None):
         site = get_object_or_404(Site, github_id=repo)
