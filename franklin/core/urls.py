@@ -1,7 +1,7 @@
 from django.conf.urls import include, url
 
 from .views import health
-from builder.views import UpdateBuildStatus
+from builder.views import domain, UpdateBuildStatus
 from github.views import builds, deployable_repos, github_webhook, \
     ProjectDetail, ProjectList, PromoteEnvironment, get_auth_token
 from users.views import user_details
@@ -36,6 +36,9 @@ v1_patterns = [
 
     # Github passthrough endpoints
     url(r'^repos/$', deployable_repos, name='deployable_repos'),
+
+    # Domain metadata
+    url(r'^domains/$', domain, name='domain'),
 
     # Utilities
     url(r'^health/$', health, name='health'),

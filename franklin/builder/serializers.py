@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from builder.models import BranchBuild, Environment, Owner, Site
+from builder.models import Build, BranchBuild, Environment, Owner, Site
 
 
 class OwnerSerializer(serializers.ModelSerializer):
@@ -31,6 +31,13 @@ class BranchBuildSerializer(serializers.ModelSerializer):
     class Meta:
         model = BranchBuild
         fields = ('branch', 'git_hash', 'status', 'created')
+
+
+class BuildSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Build
+        fields = ('path', )
 
 
 class EnvironmentSerializer(serializers.ModelSerializer):
