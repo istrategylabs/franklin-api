@@ -11,7 +11,7 @@ from core.exceptions import BadRequest
 
 
 class GithubOnly(permissions.BasePermission):
-    """ Security Check for certain API endpoints only called by Github."""
+    """ Security Check - Certain API endpoints only called by Github."""
 
     def has_permission(self, request, view):
         secret = request.META.get("HTTP_X_HUB_SIGNATURE")
@@ -25,7 +25,7 @@ class GithubOnly(permissions.BasePermission):
 
 
 class UserHasProjectWritePermission(permissions.BasePermission):
-    """ Security Check - user is an admin for the project; can create/delete"""
+    """ Security Check - User is an admin for the project; can create/delete"""
 
     def check_perms(self, user, repo, owner):
         if user and repo and owner:
@@ -54,3 +54,24 @@ class UserHasProjectWritePermission(permissions.BasePermission):
 
     def has_object_permission(self, request, view, site):
         return self.check_perms(request.user, site.name, site.owner.name)
+
+
+class IsWhitelistedProject(permissions.BasePermission):
+    """ Security Check - Only allow projects owned by owners on the whitelist
+    """
+
+    def has_permission(self, request, view):
+        # Read-Only ops (GET, OPTIONS, HEAD) pass for logged in users
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        try:
+            if request.method == 'POST':
+                project = request.data['github']
+                owner, repo = project.split('/')
+                whitelist = os.environ.get('OWNER_WHITELIST', None)
+
+                if not whitelist or owner in whitelist.split(','):
+                    return True
+        except:
+            raise BadRequest()
+        return False

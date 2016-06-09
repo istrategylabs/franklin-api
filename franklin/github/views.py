@@ -14,7 +14,8 @@ from rest_framework.response import Response
 from .api import create_repo_deploy_key, create_repo_webhook, \
     delete_deploy_key, delete_webhook, get_access_token, get_all_repos, \
     get_repo
-from .permissions import GithubOnly, UserHasProjectWritePermission
+from .permissions import GithubOnly, IsWhitelistedProject, \
+    UserHasProjectWritePermission
 from .serializers import GithubWebhookSerializer, RepositorySerializer
 from builder.models import Build, BranchBuild, Deploy, Environment, Site
 from builder.serializers import BranchBuildSerializer, FlatSiteSerializer, \
@@ -34,7 +35,8 @@ class ProjectList(APIView):
     register a new repo
     """
     permission_classes = (IsAuthenticated,
-                          UserHasProjectWritePermission)
+                          UserHasProjectWritePermission,
+                          IsWhitelistedProject)
 
     def get(self, request, format=None):
         sites = request.user.details.get_user_repos()

@@ -31,6 +31,7 @@ Now with Github deploys!
       GITHUB_SECRET=<for_validating_github_webhook_messages>    (random key used to secure communication with github)
       CORS_WHITELIST=<url_or_urls_making_frontend_calls>
       SENTRY_DSN=<url_sentry_dsn>
+      OWNER_WHITELIST=<github_owner_names>           (Only projects owned by owners on this list will be deployed. Blank allows all.)
     ```
 - Projects you wish to be deployed by franklin will need a `.franklin.yml` file in their root. Below is an example of the file contents with defaults that Franklin will use if you don't specify them.
 

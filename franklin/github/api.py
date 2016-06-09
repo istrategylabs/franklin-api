@@ -136,6 +136,7 @@ def get_all_repos(user):
     headers = get_auth_header(user)
     have_next_page = True
     repos = []
+    whitelist = os.environ.get('OWNER_WHITELIST', None)
 
     while have_next_page:
         result = None
@@ -144,13 +145,15 @@ def get_all_repos(user):
         if status.is_success(result.status_code):
             # Add all of the repos to our list
             for repo in result.json():
-                repos.append(repo)
+                owner = repo.get('owner', {}).get('login', '')
+                if not whitelist or owner in whitelist.split(','):
+                    repos.append(repo)
 
             # If the header has a paging link called 'next', update our url
             # and continue with the while loop
-            # if result.links and result.links.get('next', None):
-            #     url = result.links['next']['url']
-            #     have_next_page = True
+            if result.links and result.links.get('next', None):
+                url = result.links['next']['url']
+                have_next_page = True
     return repos
 
 
