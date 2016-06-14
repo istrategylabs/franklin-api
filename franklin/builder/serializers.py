@@ -30,7 +30,7 @@ class BranchBuildSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BranchBuild
-        fields = ('branch', 'git_hash', 'status', 'created')
+        fields = ('uuid', 'branch', 'git_hash', 'status', 'created')
 
 
 class BuildSerializer(serializers.ModelSerializer):

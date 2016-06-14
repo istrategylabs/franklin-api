@@ -129,12 +129,8 @@ def builds(request, repo):
     elif request.method == 'POST':
         branch, git_hash = site.get_newest_commit(request.user)
         env = site.environments.filter(name='Staging').first()
-
-        build, created = BranchBuild.objects.get_or_create(
+        build = BranchBuild.objects.create(
             git_hash=git_hash, branch=branch, site=site)
-        if not created and build.status == Build.SUCCESS:
-            msg = 'Resource already exists and is promotable'
-            raise ResourceExists(detail=msg)
         try:
             build.deploy(env)
         except ServiceUnavailable as e:
@@ -156,14 +152,14 @@ class PromoteEnvironment(APIView):
         try:
             site = Site.objects.get(github_id=repo)
             environment = Environment.objects.get(name__iexact=env, site=site)
-            git_hash = request.data['git_hash']
-            build = BranchBuild.objects.get(git_hash=git_hash)
+            uuid = request.data['uuid']
+            build = BranchBuild.objects.get(uuid=uuid)
             return (environment, build)
         except (BranchBuild.DoesNotExist, Environment.DoesNotExist,
                 Site.DoesNotExist) as e:
             raise NotFound(detail=e)
 
-    @validate_request_payload(['git_hash', ])
+    @validate_request_payload(['uuid', ])
     def post(self, request, repo, env, format=None):
         environment, build = self.get_object(request, repo, env)
         current_deploy = environment.get_current_deploy()

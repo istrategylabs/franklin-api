@@ -34,13 +34,13 @@ def domain(request):
 class UpdateBuildStatus(APIView):
     permission_classes = (AllowAny,)
 
-    def get_object(self, request, git_hash):
+    def get_object(self, request, uuid):
         try:
             received_env = request.data.get('environment', '')
             received_status = request.data.get('status', '')
             if received_status not in ['success', 'failed']:
                 raise ParseError(detail="status must be 'success' or 'failed'")
-            build = BranchBuild.objects.get(git_hash=git_hash)
+            build = BranchBuild.objects.get(uuid=uuid)
             environment = Environment.objects.get(name__iexact=received_env,
                                                   site=build.site)
             return (environment, build)
@@ -48,8 +48,8 @@ class UpdateBuildStatus(APIView):
                 Site.DoesNotExist) as e:
             raise NotFound(detail=e)
 
-    def post(self, request, git_hash, format=None):
-        environment, build = self.get_object(request, git_hash)
+    def post(self, request, uuid, format=None):
+        environment, build = self.get_object(request, uuid)
         received = request.data['status']
         build.status = Build.SUCCESS if received == 'success' else Build.FAILED
         build.save()

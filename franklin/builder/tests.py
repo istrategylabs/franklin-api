@@ -60,10 +60,9 @@ class SiteTestCase(TestCase):
         github_event = GithubWebhookSerializer(data=self.git_message)
         if github_event.is_valid():
             event = github_event.get_change_location()
-            git_hash = github_event.get_event_hash()
             is_tag_event = github_event.is_tag_event()
             matching_env = self.site.get_deployable_environment(
-                event, git_hash, is_tag_event)
+                event, is_tag_event)
             self.assertEqual(matching_env, self.env)
         else:
             self.fail(github_event.errors)
@@ -77,10 +76,9 @@ class SiteTestCase(TestCase):
         github_event = GithubWebhookSerializer(data=self.git_message)
         if github_event.is_valid():
             event = github_event.get_change_location()
-            git_hash = github_event.get_event_hash()
             is_tag_event = github_event.is_tag_event()
             matching_env = self.site.get_deployable_environment(
-                event, git_hash, is_tag_event)
+                event, is_tag_event)
             self.assertIsNone(matching_env)
         else:
             self.fail(github_event.errors)
@@ -158,8 +156,8 @@ class BuildTestCase(TestCase):
 
     def test_branch_build_path(self):
         """ Test that object instantiation saves correct path. """
-        expected = "{site}/{git_hash}".format(site=self.site.github_id,
-                                              git_hash='asdf1234')
+        expected = "{site}/{uuid}".format(site=self.site.github_id,
+                                          uuid=self.branch_build.uuid)
         self.assertEqual(self.branch_build.path, expected)
 
     def test_default_build_status(self):

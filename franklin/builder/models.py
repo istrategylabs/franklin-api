@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import uuid
 
 from django.core.urlresolvers import reverse
 from django.db import models
@@ -9,6 +10,7 @@ from django.utils.translation import ugettext as _
 from core.exceptions import ServiceUnavailable
 from core.helpers import generate_ssh_keys, make_rest_post_call
 from github.api import get_branch_details, get_default_branch
+
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +55,7 @@ class Site(models.Model):
     webhook_id = models.CharField(blank=True, null=True, max_length=12)
     is_active = models.BooleanField(default=True)
 
-    def get_deployable_environment(self, event, git_hash, is_tag_event=False):
+    def get_deployable_environment(self, event, is_tag_event=False):
         if self.is_active:
             for env in self.environments.all():
                 if (env.deploy_type == Environment.BRANCH and not
@@ -116,14 +118,15 @@ class Build(models.Model):
         (FAILED, _('failed'))
     )
 
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False)
     site = models.ForeignKey(Site, related_name='builds')
     created = models.DateTimeField(auto_now_add=True, editable=False)
-    path = models.CharField(max_length=100, blank=True)
     status = models.CharField(max_length=3, choices=STATUS_CHOICES,
                               default=NEW)
 
-    def get_path(self, site, name):
-        return "{0}/{1}".format(site, name)
+    @property
+    def path(self):
+        return "{0}/{1}".format(self.site.github_id, self.uuid)
 
     def can_build(self):
         return self.status is not self.BUILDING
@@ -131,7 +134,7 @@ class Build(models.Model):
     def deploy(self, environment):
         if self.can_build():
             callback = os.environ['API_BASE_URL'] + \
-                reverse('webhook:builder', args=[self.git_hash, ])
+                reverse('webhook:builder', args=[str(self.uuid), ])
 
             url = os.environ['BUILDER_URL'] + '/build'
             headers = {'content-type': 'application/json'}
@@ -160,26 +163,6 @@ class Build(models.Model):
         return '%s - %s' % (self.status, self.created)
 
 
-class TagBuild(Build):
-    """ Flavor of build that was created from a tag
-
-    :param tag: If a tag build, the name of the tag
-    """
-    tag = models.CharField(max_length=100, unique=True)
-
-    def save(self, *args, **kwargs):
-        clean_tag = re.sub('[^a-zA-Z0-9]', '', self.tag)
-        self.path = self.get_path(self.site.github_id, clean_tag)
-        super(TagBuild, self).save(*args, **kwargs)
-
-    def __str__(self):
-        return '%s %s' % (self.site.name, self.tag)
-
-    class Meta(object):
-        verbose_name = _('Tag Build')
-        verbose_name_plural = _('Tag Builds')
-
-
 class BranchBuild(Build):
     """ Flavor of build that was created from a branch
 
@@ -189,17 +172,12 @@ class BranchBuild(Build):
     git_hash = models.CharField(max_length=40)
     branch = models.CharField(max_length=100)
 
-    def save(self, *args, **kwargs):
-        self.path = self.get_path(self.site.github_id, self.git_hash)
-        super(BranchBuild, self).save(*args, **kwargs)
-
     def __str__(self):
-        return '%s %s' % (self.site.name, self.git_hash)
+        return '%s %s' % (self.site.name, self.uuid)
 
     class Meta(object):
         verbose_name = _('Branch Build')
         verbose_name_plural = _('Branch Builds')
-        unique_together = ('git_hash', 'branch')
 
 
 class Environment(models.Model):

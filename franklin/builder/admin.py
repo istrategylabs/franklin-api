@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BranchBuild, Deploy, Environment, Owner, Site, TagBuild
+from .models import BranchBuild, Deploy, Environment, Owner, Site
 
 
 class EnvironmentBuildInline(admin.TabularInline):
@@ -20,4 +20,3 @@ admin.site.register(Deploy)
 admin.site.register(Environment, EnvironmentAdmin)
 admin.site.register(Owner)
 admin.site.register(Site)
-admin.site.register(TagBuild)

@@ -243,6 +243,6 @@ class v1ContractTestCase(APITestCase):
             site=self.site, branch='staging', status=Build.SUCCESS,
             git_hash='abc123')
         Deploy.objects.create(build=build, environment=self.env)
-        response = self.client.post(url, {"git_hash": "abc123"}, **self.header)
+        response = self.client.post(url, {"uuid": build.uuid}, **self.header)
 
         self.assertEqual(201, response.status_code)

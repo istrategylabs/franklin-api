@@ -9,7 +9,7 @@ from users.views import user_details
 
 # /webhooks/
 webhook_patterns = [
-    url(r'^builder/builds/(?P<git_hash>[0-9a-zA-Z]+)$',
+    url(r'^builder/builds/(?P<uuid>[0-9a-zA-Z\-]+)$',
         UpdateBuildStatus.as_view(), name='builder'),
     url(r'^github/$', github_webhook, name='github'),
 ]

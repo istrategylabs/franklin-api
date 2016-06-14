@@ -14,6 +14,7 @@ class HelpersTestCase(TestCase):
         self.url = os.environ['BUILDER_URL'] + '/build'
         self.headers = {'content-type': 'application/json'}
         self.body = {
+            "uuid": "uuid",
             "deploy_key": "deploy_key",
             "branch": "branch",
             "git_hash": "git_hash",
@@ -22,7 +23,7 @@ class HelpersTestCase(TestCase):
             "repo_name": "name",
             "environment": "staging",
             "callback": os.environ['API_BASE_URL'] +
-                        reverse('webhook:builder', args=["githash132", ])
+                        reverse('webhook:builder', args=["uuid1234", ])
         }
 
     @mock.patch('core.helpers.requests.post', side_effect=ConnectionError)
